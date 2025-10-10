@@ -1,1683 +1,392 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>任务管理 - Week Plan</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
-        body {
-            font-family: 'Inter', 'PingFang SC', sans-serif;
-        }
-        
-        .dragging {
-            opacity: 0.5;
-        }
-        
-        .drag-over {
-            background-color: rgba(59, 130, 246, 0.1) !important;
-        }
-        
-        .task-card {
-            cursor: grab;
-            transition: all 0.2s ease;
-        }
-        
-        .task-card:active {
-            cursor: grabbing;
-        }
-        
-        .task-card:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        
-        .calendar-block {
-            min-height: 40px;
-            position: relative;
-        }
-        
-        .calendar-task {
-            position: absolute;
-            width: calc(100% - 4px);
-            left: 2px;
-            z-index: 10;
-        }
-        
-        .calendar-task .close-button {
-            opacity: 0;
-            transition: opacity 0.2s ease, background-color 0.2s ease;
-            z-index: 20;
-            pointer-events: all;
-        }
-        
-        .calendar-task:hover .close-button {
-            opacity: 1;
-        }
-        
-        .close-button {
-            cursor: pointer;
-        }
-        
-        /* Accordion sections - collapsed state */
-        .accordion-section {
-            flex-shrink: 0;
-            overflow: hidden;
-        }
-        
-        .accordion-section:not(.flex-1) {
-            height: 60px;
-        }
-        
-        .drawer {
-            transition: transform 0.3s ease;
-        }
-        
-        .drawer-open {
-            transform: translateX(0);
-        }
-        
-        .drawer-closed {
-            transform: translateX(-100%);
-        }
-        
-        .color-option {
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .color-option:hover {
-            transform: scale(1.2);
-        }
-        
-        .color-option.selected {
-            width: 24px;
-            height: 24px;
-            box-shadow: 0 0 0 2px white, 0 0 0 4px currentColor;
-        }
-        
-        .accordion-section-header {
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-        }
-        
-        .accordion-section-header:hover {
-            background-color: rgba(0, 0, 0, 0.02);
-        }
-        
-        .accordion-section-header.drag-over-section {
-            background-color: rgba(59, 130, 246, 0.1);
-            border-left: 3px solid #3b82f6;
-        }
-        
-        .toast {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: #1f2937;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 6px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .toast.show {
-            opacity: 1;
-        }
-        
-        .edit-button {
-            opacity: 0;
-            transition: opacity 0.2s ease;
-        }
-        
-        .task-card:hover .edit-button {
-            opacity: 1;
-        }
-        
-        .calendar-container {
-            overflow: auto;
-            height: calc(100vh - 32px);
-        }
-    </style>
-</head>
-<body class="bg-white">
-    <!-- Backdrop Overlay -->
-    <div id="drawerBackdrop" class="fixed inset-0 bg-black bg-opacity-30 z-40 hidden transition-opacity" onclick="closeDrawer()"></div>
-    
-    <!-- Main Container -->
-    <div class="flex h-screen">
-        <!-- Drawer (Initially Hidden) -->
-        <div id="drawer" class="drawer drawer-closed fixed left-0 top-0 h-full w-[400px] bg-white border-r border-slate-200 shadow-lg z-50">
-            <div class="flex flex-col h-full p-8 gap-6">
-                <!-- Header -->
-                <div class="flex items-center justify-between">
-                    <h2 id="drawerTitle" class="text-xl font-medium text-black">添加任务</h2>
-                    <button onclick="closeDrawer()" class="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded">
-                        <svg class="w-6 h-6 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-                
-                <!-- Form -->
-                <form id="taskForm" class="flex flex-col gap-4 flex-1">
-                    <input type="hidden" id="taskId" value="">
-                    
-                    <!-- Name Field -->
-                    <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-black">
-                            名称 <span class="text-red-500">*</span>
-                        </label>
-                        <input 
-                            type="text" 
-                            id="taskName" 
-                            placeholder="请输入" 
-                            required
-                            class="border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                        />
-                    </div>
-                    
-                    <!-- Quadrant Field -->
-                    <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-black">象限</label>
-                        <select 
-                            id="taskQuadrant" 
-                            class="border border-slate-200 rounded-md px-3 py-2 text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                        >
-                            <option value="重要不紧急">重要不紧急</option>
-                            <option value="重要紧急">重要紧急</option>
-                            <option value="不重要但紧急">不重要但紧急</option>
-                            <option value="不重要不紧急">不重要不紧急</option>
-                        </select>
-                    </div>
-                    
-                    <!-- Color Field -->
-                    <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-black">颜色</label>
-                        <div class="flex gap-6 py-2 flex-wrap">
-                            <div class="color-option selected bg-violet-500" data-color="violet" onclick="selectColor('violet')"></div>
-                            <div class="color-option bg-yellow-500" data-color="yellow" onclick="selectColor('yellow')"></div>
-                            <div class="color-option bg-cyan-500" data-color="cyan" onclick="selectColor('cyan')"></div>
-                            <div class="color-option bg-emerald-500" data-color="emerald" onclick="selectColor('emerald')"></div>
-                            <div class="color-option bg-amber-500" data-color="amber" onclick="selectColor('amber')"></div>
-                            <div class="color-option bg-rose-500" data-color="rose" onclick="selectColor('rose')"></div>
-                        </div>
-                        <input type="hidden" id="taskColor" value="violet">
-                    </div>
-                    
-                    <!-- Save Button -->
-                    <div class="mt-auto">
-                        <button 
-                            type="submit" 
-                            class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors"
-                        >
-                            保存
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-        
-        <!-- Accordion Sidebar -->
-        <div class="w-80 bg-white border-r border-slate-200 flex flex-col h-screen">
-            <!-- User Section -->
-            <div id="userSection" class="border-b border-slate-200 flex-shrink-0">
-                <!-- Logged Out State -->
-                <div id="loggedOutState" class="px-6 py-6 space-y-3">
-                    <div class="text-sm text-gray-600 mb-4">
-                        <p class="font-medium text-black mb-1">欢迎使用任务管理器</p>
-                        <p class="text-xs">登录后可在多设备间同步您的任务</p>
-                    </div>
-                    <button onclick="showLoginModal()" class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors">
-                        登录
-                    </button>
-                    <button onclick="showSignupModal()" class="w-full border border-slate-200 text-slate-900 text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-50 transition-colors">
-                        注册
-                    </button>
-                </div>
-                
-                <!-- Logged In State -->
-                <div id="loggedInState" class="px-6 py-6 hidden">
-                    <div class="flex items-center gap-3 mb-4">
-                        <div id="userAvatar" class="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm">
-                            U
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div id="userName" class="text-sm font-medium text-black truncate">用户名</div>
-                            <div id="userEmail" class="text-xs text-gray-500 truncate">user@example.com</div>
-                        </div>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="syncData()" class="flex-1 border border-slate-200 text-slate-700 text-xs font-medium px-3 py-2 rounded-md hover:bg-slate-50 transition-colors flex items-center justify-center gap-1" title="同步数据">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            同步
-                        </button>
-                        <button onclick="signOut()" class="flex-1 border border-red-200 text-red-600 text-xs font-medium px-3 py-2 rounded-md hover:bg-red-50 transition-colors">
-                            登出
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Planning Section -->
-            <div id="planningSection" class="border-b border-slate-200 flex flex-col accordion-section flex-1 min-h-0">
-                <div class="flex items-center justify-between px-6 accordion-section-header flex-shrink-0 h-[60px]" 
-                     onclick="toggleSection('planning')"
-                     ondragover="handleSectionDragOver(event, 'planning')"
-                     ondragleave="handleSectionDragLeave(event)"
-                     ondrop="handleSectionDrop(event, 'planning')">
-                    <h3 class="text-xl font-medium text-black">计划中 (<span id="planningCount">0</span>)</h3>
-                    <svg id="planningChevron" class="w-6 h-6 transform rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
-                <div id="planningContent" class="px-6 pb-6 space-y-6 overflow-y-auto flex-1">
-                    <!-- Empty State -->
-                    <div id="emptyState" class="flex items-center justify-center py-32">
-                        <button onclick="openDrawer('create')" class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                            </svg>
-                            添加任务
-                        </button>
-                    </div>
-                    <!-- Task Sections -->
-                    <div id="taskSections" class="space-y-6 hidden pb-4">
-                        <button onclick="openDrawer('create')" class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 mb-4">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                            </svg>
-                            添加任务
-                        </button>
-                        <div id="quadrant-重要不紧急" class="space-y-4">
-                            <div class="text-xs text-gray-500 font-medium">重要不紧急</div>
-                            <div class="space-y-2 task-list min-h-[20px]"></div>
-                        </div>
-                        <div id="quadrant-重要紧急" class="space-y-4">
-                            <div class="text-xs text-gray-500 font-medium">重要紧急</div>
-                            <div class="space-y-2 task-list min-h-[20px]"></div>
-                        </div>
-                        <div id="quadrant-不重要但紧急" class="space-y-4">
-                            <div class="text-xs text-gray-500 font-medium">不重要但紧急</div>
-                            <div class="space-y-2 task-list min-h-[20px]"></div>
-                        </div>
-                        <div id="quadrant-不重要不紧急" class="space-y-4">
-                            <div class="text-xs text-gray-500 font-medium">不重要不紧急</div>
-                            <div class="space-y-2 task-list min-h-[20px]"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- This Week Section -->
-            <div id="thisweekSection" class="border-b border-slate-200 flex flex-col accordion-section">
-                <div class="flex items-center justify-between px-6 accordion-section-header flex-shrink-0 h-[60px]" 
-                     onclick="toggleSection('thisweek')"
-                     ondragover="handleSectionDragOver(event, 'thisweek')"
-                     ondragleave="handleSectionDragLeave(event)"
-                     ondrop="handleSectionDrop(event, 'thisweek')">
-                    <h3 class="text-xl font-medium text-black">本周要务 (<span id="thisweekCount">0</span>)</h3>
-                    <svg id="thisweekChevron" class="w-6 h-6 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
-                <div id="thisweekContent" class="px-6 pb-6 space-y-6 hidden overflow-y-auto flex-1">
-                    <!-- Quadrant sections always visible -->
-                    <div id="thisweek-quadrant-重要不紧急" class="space-y-4">
-                        <div class="text-xs text-gray-500 font-medium">重要不紧急</div>
-                        <div class="space-y-2 thisweek-task-list min-h-[20px]"></div>
-                    </div>
-                    <div id="thisweek-quadrant-重要紧急" class="space-y-4">
-                        <div class="text-xs text-gray-500 font-medium">重要紧急</div>
-                        <div class="space-y-2 thisweek-task-list min-h-[20px]"></div>
-                    </div>
-                    <div id="thisweek-quadrant-不重要但紧急" class="space-y-4">
-                        <div class="text-xs text-gray-500 font-medium">不重要但紧急</div>
-                        <div class="space-y-2 thisweek-task-list min-h-[20px]"></div>
-                    </div>
-                    <div id="thisweek-quadrant-不重要不紧急" class="space-y-4">
-                        <div class="text-xs text-gray-500 font-medium">不重要不紧急</div>
-                        <div class="space-y-2 thisweek-task-list min-h-[20px]"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Finished Section -->
-            <div id="finishedSection" class="border-b border-slate-200 flex flex-col accordion-section">
-                <div class="flex items-center justify-between px-6 accordion-section-header flex-shrink-0 h-[60px]" 
-                     onclick="toggleSection('finished')"
-                     ondragover="handleSectionDragOver(event, 'finished')"
-                     ondragleave="handleSectionDragLeave(event)"
-                     ondrop="handleSectionDrop(event, 'finished')">
-                    <h3 class="text-xl font-medium text-black">已完成 (<span id="finishedCount">0</span>)</h3>
-                    <svg id="finishedChevron" class="w-6 h-6 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
-                <div id="finishedContent" class="px-6 pb-6 space-y-6 hidden overflow-y-auto flex-1">
-                    <!-- Quadrant sections always visible -->
-                    <div id="finished-quadrant-重要不紧急" class="space-y-4">
-                        <div class="text-xs text-gray-500 font-medium">重要不紧急</div>
-                        <div class="space-y-2 finished-task-list min-h-[20px]"></div>
-                    </div>
-                    <div id="finished-quadrant-重要紧急" class="space-y-4">
-                        <div class="text-xs text-gray-500 font-medium">重要紧急</div>
-                        <div class="space-y-2 finished-task-list min-h-[20px]"></div>
-                    </div>
-                    <div id="finished-quadrant-不重要但紧急" class="space-y-4">
-                        <div class="text-xs text-gray-500 font-medium">不重要但紧急</div>
-                        <div class="space-y-2 finished-task-list min-h-[20px]"></div>
-                    </div>
-                    <div id="finished-quadrant-不重要不紧急" class="space-y-4">
-                        <div class="text-xs text-gray-500 font-medium">不重要不紧急</div>
-                        <div class="space-y-2 finished-task-list min-h-[20px]"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Calendar View -->
-        <div class="flex-1 flex flex-col calendar-container overflow-y-auto">
-            <div class="px-8 py-8">
-                <!-- Calendar Header (Sticky) -->
-                <div class="bg-neutral-100 px-12 py-2.5 rounded-t-lg sticky top-0 z-30">
-                    <div class="text-base font-medium text-black" id="weekRange">本周安排: </div>
-                </div>
-                
-                <!-- Calendar Grid -->
-                <div class="border-l border-t border-slate-200">
-                    <!-- Week Days Header (Sticky) -->
-                    <div class="flex sticky top-[44px] z-20 bg-white">
-                        <div class="w-10 flex-shrink-0"></div>
-                        <div class="flex flex-1">
-                            <div class="flex-1 bg-neutral-50 border-r border-b border-slate-200 px-2 py-1" id="day-0">
-                                <div class="text-xs font-bold text-zinc-500">21</div>
-                                <div class="text-base font-medium text-black">SUN</div>
-                            </div>
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1" id="day-1">
-                                <div class="text-xs font-bold text-zinc-500">22</div>
-                                <div class="text-base font-medium text-black">MON</div>
-                            </div>
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1" id="day-2">
-                                <div class="text-xs font-bold text-zinc-500">23</div>
-                                <div class="text-base font-medium text-black">TUE</div>
-                            </div>
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1" id="day-3">
-                                <div class="text-xs font-bold text-zinc-500">24</div>
-                                <div class="text-base font-medium text-black">WED</div>
-                            </div>
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1" id="day-4">
-                                <div class="text-xs font-bold text-zinc-500">25</div>
-                                <div class="text-base font-medium text-black">THU</div>
-                            </div>
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1" id="day-5">
-                                <div class="text-xs font-bold text-zinc-500">26</div>
-                                <div class="text-base font-medium text-black">FRI</div>
-                            </div>
-                            <div class="flex-1 bg-neutral-50 border-r border-b border-slate-200 px-2 py-1" id="day-6">
-                                <div class="text-xs font-bold text-zinc-500">27</div>
-                                <div class="text-base font-medium text-black">SAT</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Time Rows -->
-                    <div id="calendarGrid"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Toast Notification -->
-    <div id="toast" class="toast"></div>
-    
-    <!-- Login Modal -->
-    <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div class="px-6 py-5 border-b border-slate-200">
-                <div class="flex items-center justify-between">
-                    <h2 class="text-xl font-semibold text-black">登录</h2>
-                    <button onclick="closeLoginModal()" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            <div class="px-6 py-6 space-y-4">
-                <!-- Google OAuth -->
-                <button onclick="signInWithGoogle()" class="w-full border border-slate-200 text-slate-700 text-sm font-medium px-4 py-2.5 rounded-md hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
-                    <svg class="w-5 h-5" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    使用 Google 登录
-                </button>
-                
-                <div class="relative">
-                    <div class="absolute inset-0 flex items-center">
-                        <div class="w-full border-t border-slate-200"></div>
-                    </div>
-                    <div class="relative flex justify-center text-xs">
-                        <span class="px-2 bg-white text-gray-500">或使用邮箱</span>
-                    </div>
-                </div>
-                
-                <!-- Email/Password Form -->
-                <form id="loginForm" onsubmit="signInWithEmail(event)" class="space-y-4">
-                    <div>
-                        <label class="text-sm font-medium text-black block mb-1">邮箱</label>
-                        <input 
-                            type="email" 
-                            id="loginEmail" 
-                            required
-                            placeholder="your@email.com"
-                            class="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                        />
-                    </div>
-                    <div>
-                        <label class="text-sm font-medium text-black block mb-1">密码</label>
-                        <input 
-                            type="password" 
-                            id="loginPassword" 
-                            required
-                            placeholder="••••••••"
-                            class="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                        />
-                    </div>
-                    <button 
-                        type="submit" 
-                        class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors"
-                    >
-                        登录
-                    </button>
-                </form>
-                
-                <p class="text-xs text-center text-gray-500">
-                    还没有账号？ <button onclick="closeLoginModal(); showSignupModal()" class="text-slate-900 font-medium hover:underline">立即注册</button>
-                </p>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Signup Modal -->
-    <div id="signupModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div class="px-6 py-5 border-b border-slate-200">
-                <div class="flex items-center justify-between">
-                    <h2 class="text-xl font-semibold text-black">注册</h2>
-                    <button onclick="closeSignupModal()" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            <div class="px-6 py-6 space-y-4">
-                <!-- Google OAuth -->
-                <button onclick="signInWithGoogle()" class="w-full border border-slate-200 text-slate-700 text-sm font-medium px-4 py-2.5 rounded-md hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
-                    <svg class="w-5 h-5" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    使用 Google 注册
-                </button>
-                
-                <div class="relative">
-                    <div class="absolute inset-0 flex items-center">
-                        <div class="w-full border-t border-slate-200"></div>
-                    </div>
-                    <div class="relative flex justify-center text-xs">
-                        <span class="px-2 bg-white text-gray-500">或使用邮箱</span>
-                    </div>
-                </div>
-                
-                <!-- Email/Password Form -->
-                <form id="signupForm" onsubmit="signUpWithEmail(event)" class="space-y-4">
-                    <div>
-                        <label class="text-sm font-medium text-black block mb-1">邮箱</label>
-                        <input 
-                            type="email" 
-                            id="signupEmail" 
-                            required
-                            placeholder="your@email.com"
-                            class="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                        />
-                    </div>
-                    <div>
-                        <label class="text-sm font-medium text-black block mb-1">密码</label>
-                        <input 
-                            type="password" 
-                            id="signupPassword" 
-                            required
-                            placeholder="至少6位字符"
-                            minlength="6"
-                            class="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                        />
-                    </div>
-                    <button 
-                        type="submit" 
-                        class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors"
-                    >
-                        注册
-                    </button>
-                </form>
-                
-                <p class="text-xs text-center text-gray-500">
-                    已有账号？ <button onclick="closeSignupModal(); showLoginModal()" class="text-slate-900 font-medium hover:underline">立即登录</button>
-                </p>
-            </div>
-        </div>
-    </div>
+# 🚀 Supabase设置指南
 
-    <script>
-        // =================================================================
-        // SUPABASE CONFIGURATIONss
-        // =================================================================
-        // TODO: Replace these with your actual Supabase credentials
-        const SUPABASE_URL = 'https://wzjxtzpxojbmhwxropio.supabase.co'
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6anh0enB4b2pibWh3eHJvcGlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwNjQ3ODgsImV4cCI6MjA3NTY0MDc4OH0.lImwPZn-ca-d4oVWpQ5FUtXdM_NBvdkplqh1hUk3stQ'
-        
-        // Initialize Supabase client (will be null if credentials not set)
-        let supabase = null
-        let currentUser = null
-        
-        // Check if credentials are configured
-        if (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE') {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-            console.log('✅ Supabase initialized')
-        } else {
-            console.warn('⚠️ Supabase not configured. Using localStorage only.')
-        }
-        
-        // Global State
-        let tasks = [];
-        let calendarTasks = [];
-        let editingTaskId = null;
-        let draggedTask = null;
-        let draggedCalendarTask = null;
-        let lastMovedTask = null;
-        let lastDeletedData = null;
-        let undoTimeout = null;
-        
-        const colorMap = {
-            'violet': 'bg-violet-500',
-            'yellow': 'bg-yellow-500',
-            'cyan': 'bg-sky-500',
-            'emerald': 'bg-emerald-500',
-            'amber': 'bg-amber-500',
-            'rose': 'bg-rose-500'
-        };
-        
-        const hours = [
-            '7 AM', '8 AM', '9 AM', '10 AM', '11 AM', '12 PM',
-            '1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM',
-            '7 PM', '8 PM', '9 PM', 'Night'
-        ];
-        
-        // =================================================================
-        // AUTHENTICATION FUNCTIONS
-        // =================================================================
-        
-        // Check authentication state on page load
-        async function checkAuthState() {
-            if (!supabase) {
-                // No Supabase configured, stay logged out
-                updateUIForLoggedOut()
-                return
-            }
-            
-            try {
-                const { data: { user } } = await supabase.auth.getUser()
-                if (user) {
-                    currentUser = user
-                    updateUIForLoggedIn(user)
-                    await loadDataFromSupabase()
-                } else {
-                    updateUIForLoggedOut()
-                    loadTasksFromStorage() // Fallback to localStorage
-                }
-            } catch (error) {
-                console.error('Auth check error:', error)
-                updateUIForLoggedOut()
-                loadTasksFromStorage()
-            }
-        }
-        
-        // Update UI for logged in state
-        function updateUIForLoggedIn(user) {
-            document.getElementById('loggedOutState').classList.add('hidden')
-            document.getElementById('loggedInState').classList.remove('hidden')
-            
-            // Set user info
-            document.getElementById('userName').textContent = user.user_metadata?.name || user.email?.split('@')[0] || '用户'
-            document.getElementById('userEmail').textContent = user.email
-            
-            // Set avatar initial
-            const initial = (user.user_metadata?.name || user.email || 'U')[0].toUpperCase()
-            document.getElementById('userAvatar').textContent = initial
-        }
-        
-        // Update UI for logged out state
-        function updateUIForLoggedOut() {
-            document.getElementById('loggedOutState').classList.remove('hidden')
-            document.getElementById('loggedInState').classList.add('hidden')
-        }
-        
-        // Modal controls
-        function showLoginModal() {
-            document.getElementById('loginModal').classList.remove('hidden')
-        }
-        
-        function closeLoginModal() {
-            document.getElementById('loginModal').classList.add('hidden')
-            document.getElementById('loginForm').reset()
-        }
-        
-        function showSignupModal() {
-            document.getElementById('signupModal').classList.remove('hidden')
-        }
-        
-        function closeSignupModal() {
-            document.getElementById('signupModal').classList.add('hidden')
-            document.getElementById('signupForm').reset()
-        }
-        
-        // Google OAuth Sign In
-        async function signInWithGoogle() {
-            if (!supabase) {
-                alert('请先配置 Supabase 凭据')
-                return
-            }
-            
-            try {
-                const { data, error } = await supabase.auth.signInWithOAuth({
-                    provider: 'google',
-                    options: {
-                        redirectTo: window.location.origin
-                    }
-                })
-                
-                if (error) throw error
-                // OAuth will redirect, no need to handle response here
-            } catch (error) {
-                console.error('Google sign in error:', error)
-                alert('Google 登录失败: ' + error.message)
-            }
-        }
-        
-        // Email/Password Sign In
-        async function signInWithEmail(event) {
-            event.preventDefault()
-            
-            if (!supabase) {
-                alert('请先配置 Supabase 凭据')
-                return
-            }
-            
-            const email = document.getElementById('loginEmail').value
-            const password = document.getElementById('loginPassword').value
-            
-            try {
-                const { data, error } = await supabase.auth.signInWithPassword({
-                    email: email,
-                    password: password
-                })
-                
-                if (error) throw error
-                
-                currentUser = data.user
-                updateUIForLoggedIn(data.user)
-                closeLoginModal()
-                await loadDataFromSupabase()
-                showToast('登录成功')
-            } catch (error) {
-                console.error('Email sign in error:', error)
-                alert('登录失败: ' + error.message)
-            }
-        }
-        
-        // Email/Password Sign Up
-        async function signUpWithEmail(event) {
-            event.preventDefault()
-            
-            if (!supabase) {
-                alert('请先配置 Supabase 凭据')
-                return
-            }
-            
-            const email = document.getElementById('signupEmail').value
-            const password = document.getElementById('signupPassword').value
-            
-            try {
-                const { data, error } = await supabase.auth.signUp({
-                    email: email,
-                    password: password
-                })
-                
-                if (error) throw error
-                
-                closeSignupModal()
-                alert('注册成功！请检查您的邮箱以验证账号。')
-            } catch (error) {
-                console.error('Sign up error:', error)
-                alert('注册失败: ' + error.message)
-            }
-        }
-        
-        // Sign Out
-        async function signOut() {
-            if (!supabase) return
-            
-            try {
-                const { error } = await supabase.auth.signOut()
-                if (error) throw error
-                
-                currentUser = null
-                tasks = []
-                calendarTasks = []
-                updateUIForLoggedOut()
-                renderTasks()
-                renderCalendarTasks()
-                showToast('已登出')
-            } catch (error) {
-                console.error('Sign out error:', error)
-                alert('登出失败: ' + error.message)
-            }
-        }
-        
-        // =================================================================
-        // DATA SYNC FUNCTIONS
-        // =================================================================
-        
-        // Load data from Supabase
-        async function loadDataFromSupabase() {
-            if (!supabase || !currentUser) return
-            
-            try {
-                const { data, error } = await supabase
-                    .from('user_tasks')
-                    .select('*')
-                    .eq('user_id', currentUser.id)
-                    .single()
-                
-                if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-                    throw error
-                }
-                
-                if (data) {
-                    tasks = data.tasks || []
-                    calendarTasks = data.calendar_tasks || []
-                    renderTasks()
-                    renderCalendarTasks()
-                    showToast('数据已同步')
-                }
-            } catch (error) {
-                console.error('Load data error:', error)
-                showToast('加载数据失败，使用本地数据')
-                loadTasksFromStorage() // Fallback
-            }
-        }
-        
-        // Save data to Supabase
-        async function saveDataToSupabase() {
-            if (!supabase || !currentUser) {
-                saveTasksToStorage() // Fallback to localStorage
-                return
-            }
-            
-            try {
-                const { data, error } = await supabase
-                    .from('user_tasks')
-                    .upsert({
-                        user_id: currentUser.id,
-                        tasks: tasks,
-                        calendar_tasks: calendarTasks,
-                        updated_at: new Date().toISOString()
-                    }, {
-                        onConflict: 'user_id'
-                    })
-                
-                if (error) throw error
-                
-                // Also save to localStorage as backup
-                saveTasksToStorage()
-            } catch (error) {
-                console.error('Save data error:', error)
-                // Fallback to localStorage
-                saveTasksToStorage()
-            }
-        }
-        
-        // Manual sync button
-        async function syncData() {
-            if (!supabase || !currentUser) {
-                alert('请先登录')
-                return
-            }
-            
-            await saveDataToSupabase()
-            await loadDataFromSupabase()
-        }
-        
-        // Listen for auth state changes
-        if (supabase) {
-            supabase.auth.onAuthStateChange((event, session) => {
-                console.log('Auth state changed:', event)
-                if (event === 'SIGNED_IN' && session?.user) {
-                    currentUser = session.user
-                    updateUIForLoggedIn(session.user)
-                    loadDataFromSupabase()
-                } else if (event === 'SIGNED_OUT') {
-                    currentUser = null
-                    updateUIForLoggedOut()
-                }
-            })
-        }
-        
-        // =================================================================
-        // INITIALIZE
-        // =================================================================
-        
-        document.addEventListener('DOMContentLoaded', async () => {
-            initializeWeekDates();
-            generateCalendarGrid();
-            
-            // Check auth state first
-            await checkAuthState();
-            
-            renderTasks();
-            
-            // Keyboard shortcuts
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    closeDrawer();
-                }
-            });
-            
-            // Close drawer when clicking outside
-            document.getElementById('drawer').addEventListener('click', (e) => {
-                if (e.target.id === 'drawer') {
-                    closeDrawer();
-                }
-            });
-        });
-        
-        // Date Utilities
-        function initializeWeekDates() {
-            const today = new Date();
-            const dayOfWeek = today.getDay();
-            const startOfWeek = new Date(today);
-            startOfWeek.setDate(today.getDate() - dayOfWeek);
-            
-            const endOfWeek = new Date(startOfWeek);
-            endOfWeek.setDate(startOfWeek.getDate() + 6);
-            
-            document.getElementById('weekRange').textContent = 
-                `本周安排: ${startOfWeek.getMonth() + 1}/${startOfWeek.getDate()} - ${endOfWeek.getMonth() + 1}/${endOfWeek.getDate()}`;
-            
-            const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-            for (let i = 0; i < 7; i++) {
-                const date = new Date(startOfWeek);
-                date.setDate(startOfWeek.getDate() + i);
-                const dayElement = document.getElementById(`day-${i}`);
-                if (dayElement) {
-                    dayElement.innerHTML = `
-                        <div class="text-xs font-bold text-zinc-500">${date.getDate()}</div>
-                        <div class="text-base font-medium text-black">${days[i]}</div>
-                    `;
-                }
-            }
-        }
-        
-        // Calendar Grid Generation
-        function generateCalendarGrid() {
-            const grid = document.getElementById('calendarGrid');
-            let html = '';
-            
-            hours.forEach((hour, hourIndex) => {
-                html += `
-                    <div class="flex">
-                        <div class="w-10 flex-shrink-0 text-xs font-medium text-zinc-500 leading-4 pt-0">${hour}</div>
-                        <div class="flex flex-1">
-                `;
-                
-                for (let day = 0; day < 7; day++) {
-                    // Determine background color based on day and hour
-                    // Special color for 12 PM row (hourIndex 5)
-                    let dayBgClass;
-                    if (hourIndex === 5) {
-                        // 12 PM row - special yellow color
-                        dayBgClass = '';
-                    } else if (day === 0 || day === 6) {
-                        // Weekends - neutral-50
-                        dayBgClass = 'bg-neutral-50';
-                    } else {
-                        // Weekdays - white
-                        dayBgClass = 'bg-white';
-                    }
-                    
-                    // 12 PM row with 20% opacity
-                    const styleAttr = hourIndex === 5 ? ' style="background-color: rgba(231, 210, 123, 0.2);"' : '';
-                    
-                    html += `
-                        <div class="flex-1 border-r border-slate-200">
-                            <div class="${dayBgClass} calendar-block border-b border-slate-200 h-20 relative"${styleAttr}
-                                 data-day="${day}" 
-                                 data-hour="${hourIndex}"
-                                 ondragover="handleCalendarDragOver(event)"
-                                 ondragleave="handleCalendarDragLeave(event)"
-                                 ondrop="handleCalendarDrop(event)">
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                html += `
-                        </div>
-                    </div>
-                `;
-            });
-            
-            grid.innerHTML = html;
-        }
-        
-        // Drawer Functions
-        function openDrawer(mode, taskId = null) {
-            const drawer = document.getElementById('drawer');
-            const backdrop = document.getElementById('drawerBackdrop');
-            const title = document.getElementById('drawerTitle');
-            const form = document.getElementById('taskForm');
-            
-            drawer.classList.remove('drawer-closed');
-            drawer.classList.add('drawer-open');
-            backdrop.classList.remove('hidden');
-            
-            if (mode === 'edit' && taskId) {
-                title.textContent = '编辑任务';
-                const task = tasks.find(t => t.id === taskId);
-                if (task) {
-                    document.getElementById('taskId').value = task.id;
-                    document.getElementById('taskName').value = task.name;
-                    document.getElementById('taskQuadrant').value = task.quadrant;
-                    document.getElementById('taskColor').value = task.color;
-                    selectColor(task.color);
-                }
-            } else {
-                title.textContent = '添加任务';
-                form.reset();
-                document.getElementById('taskId').value = '';
-                document.getElementById('taskColor').value = 'violet';
-                selectColor('violet');
-            }
-            
-            // Focus on name input
-            setTimeout(() => {
-                document.getElementById('taskName').focus();
-            }, 100);
-        }
-        
-        function closeDrawer() {
-            const drawer = document.getElementById('drawer');
-            const backdrop = document.getElementById('drawerBackdrop');
-            drawer.classList.remove('drawer-open');
-            drawer.classList.add('drawer-closed');
-            backdrop.classList.add('hidden');
-        }
-        
-        function selectColor(color) {
-            document.querySelectorAll('.color-option').forEach(el => {
-                el.classList.remove('selected');
-            });
-            document.querySelector(`.color-option[data-color="${color}"]`).classList.add('selected');
-            document.getElementById('taskColor').value = color;
-        }
-        
-        // Task Form Submission
-        document.getElementById('taskForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            
-            const taskId = document.getElementById('taskId').value;
-            const name = document.getElementById('taskName').value.trim();
-            const quadrant = document.getElementById('taskQuadrant').value;
-            const color = document.getElementById('taskColor').value;
-            
-            if (!name) {
-                showToast('请输入任务名称');
-                return;
-            }
-            
-            if (taskId) {
-                // Edit existing task
-                const task = tasks.find(t => t.id === taskId);
-                if (task) {
-                    const oldQuadrant = task.quadrant;
-                    task.name = name;
-                    task.quadrant = quadrant;
-                    task.color = color;
-                    
-                    // Update all calendar instances
-                    calendarTasks.forEach(ct => {
-                        if (ct.taskId === taskId) {
-                            ct.name = name;
-                            ct.color = color;
-                        }
-                    });
-                }
-            } else {
-                // Create new task
-                const newTask = {
-                    id: Date.now().toString(),
-                    name,
-                    quadrant,
-                    color,
-                    section: 'planning'
-                };
-                tasks.push(newTask);
-            }
-            
-            saveDataToSupabase();
-            renderTasks();
-            closeDrawer();
-            showToast(taskId ? '任务已更新' : '任务已创建');
-        });
-        
-        // Section Toggle - Only one section open at a time
-        function toggleSection(section) {
-            const content = document.getElementById(`${section}Content`);
-            const chevron = document.getElementById(`${section}Chevron`);
-            const sectionContainer = document.getElementById(`${section}Section`);
-            const isCurrentlyOpen = !content.classList.contains('hidden');
-            
-            // Close all sections and remove flex-1
-            ['planning', 'thisweek', 'finished'].forEach(s => {
-                const sContent = document.getElementById(`${s}Content`);
-                const sChevron = document.getElementById(`${s}Chevron`);
-                const sContainer = document.getElementById(`${s}Section`);
-                sContent.classList.add('hidden');
-                sChevron.classList.remove('rotate-180');
-                sContainer.classList.remove('flex-1', 'min-h-0');
-            });
-            
-            // If the clicked section was closed, open it and add flex-1
-            if (!isCurrentlyOpen) {
-                content.classList.remove('hidden');
-                chevron.classList.add('rotate-180');
-                sectionContainer.classList.add('flex-1', 'min-h-0');
-            }
-        }
-        
-        // Render Tasks
-        function renderTasks() {
-            // Clear all sections
-            document.querySelectorAll('.task-list').forEach(el => el.innerHTML = '');
-            document.querySelectorAll('.thisweek-task-list').forEach(el => el.innerHTML = '');
-            document.querySelectorAll('.finished-task-list').forEach(el => el.innerHTML = '');
-            
-            const planningSectionTasks = tasks.filter(t => t.section === 'planning');
-            const thisweekTasks = tasks.filter(t => t.section === 'thisweek');
-            const finishedTasks = tasks.filter(t => t.section === 'finished');
-            
-            // Render planning section
-            if (planningSectionTasks.length === 0) {
-                document.getElementById('emptyState').classList.remove('hidden');
-                document.getElementById('taskSections').classList.add('hidden');
-            } else {
-                document.getElementById('emptyState').classList.add('hidden');
-                document.getElementById('taskSections').classList.remove('hidden');
-                
-                // Group tasks by quadrant
-                planningSectionTasks.forEach(task => {
-                    const quadrantContainer = document.querySelector(`#quadrant-${task.quadrant} .task-list`);
-                    if (quadrantContainer) {
-                        quadrantContainer.appendChild(createTaskElement(task));
-                    }
-                });
-            }
-            
-            // Render thisweek section - always show all quadrants
-            thisweekTasks.forEach(task => {
-                const quadrantContainer = document.querySelector(`#thisweek-quadrant-${task.quadrant} .thisweek-task-list`);
-                if (quadrantContainer) {
-                    quadrantContainer.appendChild(createSimpleTaskElement(task));
-                }
-            });
-            
-            // Render finished section - always show all quadrants
-            finishedTasks.forEach(task => {
-                const quadrantContainer = document.querySelector(`#finished-quadrant-${task.quadrant} .finished-task-list`);
-                if (quadrantContainer) {
-                    quadrantContainer.appendChild(createSimpleTaskElement(task));
-                }
-            });
-            
-            // Update counts
-            document.getElementById('planningCount').textContent = planningSectionTasks.length;
-            document.getElementById('thisweekCount').textContent = thisweekTasks.length;
-            document.getElementById('finishedCount').textContent = finishedTasks.length;
-            
-            // Render calendar tasks
-            renderCalendarTasks();
-        }
-        
-        function renderQuadrantSection(sectionName, sectionTasks) {
-            const container = document.getElementById(`${sectionName}-quadrants`);
-            container.innerHTML = '';
-            
-            if (sectionTasks.length === 0) {
-                return;
-            }
-            
-            const quadrants = ['重要不紧急', '重要紧急', '不重要但紧急', '不重要不紧急'];
-            
-            quadrants.forEach(quadrant => {
-                const quadrantTasks = sectionTasks.filter(t => t.quadrant === quadrant);
-                if (quadrantTasks.length > 0) {
-                    const quadrantDiv = document.createElement('div');
-                    quadrantDiv.className = 'space-y-4';
-                    quadrantDiv.innerHTML = `<div class="text-xs text-gray-500 font-medium">${quadrant}</div>`;
-                    
-                    const taskList = document.createElement('div');
-                    taskList.className = 'space-y-2';
-                    
-                    quadrantTasks.forEach(task => {
-                        taskList.appendChild(createSimpleTaskElement(task));
-                    });
-                    
-                    quadrantDiv.appendChild(taskList);
-                    container.appendChild(quadrantDiv);
-                }
-            });
-        }
-        
-        function createSimpleTaskElement(task) {
-            const div = document.createElement('div');
-            div.className = 'task-card bg-white border-l-0 border-r border-t border-b border-slate-200 rounded h-10 flex items-center gap-1 pr-2';
-            div.draggable = true;
-            div.dataset.taskId = task.id;
-            
-            div.innerHTML = `
-                <div class="${colorMap[task.color]} h-full w-1 flex-shrink-0 rounded-l"></div>
-                <div class="flex items-center justify-center w-4 h-4 flex-shrink-0 ml-1">
-                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
-                        <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                        <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
-                    </svg>
-                </div>
-                <div class="flex-1 text-sm text-gray-800 truncate">${escapeHtml(task.name)}</div>
-                <button class="edit-button w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded flex-shrink-0" onclick="event.stopPropagation(); openDrawer('edit', '${task.id}')" title="编辑任务">
-                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                </button>
-                <button class="edit-button w-6 h-6 flex items-center justify-center hover:bg-red-100 rounded flex-shrink-0 text-red-600" onclick="event.stopPropagation(); deleteTask('${task.id}')" title="删除任务">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                </button>
-            `;
-            
-            // Drag events for accordion tasks
-            div.addEventListener('dragstart', (e) => {
-                draggedTask = task;
-                div.classList.add('dragging');
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', task.id);
-            });
-            
-            div.addEventListener('dragend', (e) => {
-                div.classList.remove('dragging');
-                draggedTask = null;
-                document.querySelectorAll('.accordion-section-header').forEach(header => {
-                    header.classList.remove('drag-over-section');
-                });
-            });
-            
-            // Prevent drag when clicking buttons
-            const buttons = div.querySelectorAll('button');
-            buttons.forEach(btn => {
-                btn.addEventListener('mousedown', (e) => {
-                    e.stopPropagation();
-                });
-            });
-            
-            return div;
-        }
-        
-        function createTaskElement(task) {
-            const div = document.createElement('div');
-            div.className = 'task-card bg-white border-l-0 border-r border-t border-b border-slate-200 rounded h-10 flex items-center gap-1 pr-2';
-            div.draggable = true;
-            div.dataset.taskId = task.id;
-            
-            div.innerHTML = `
-                <div class="${colorMap[task.color]} h-full w-1 flex-shrink-0 rounded-l"></div>
-                <div class="flex items-center justify-center w-4 h-4 flex-shrink-0 ml-1">
-                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
-                        <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                        <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
-                    </svg>
-                </div>
-                <div class="flex-1 text-sm text-gray-800 truncate">${escapeHtml(task.name)}</div>
-                <button class="edit-button w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded flex-shrink-0" onclick="event.stopPropagation(); openDrawer('edit', '${task.id}')" title="编辑任务">
-                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                </button>
-                <button class="edit-button w-6 h-6 flex items-center justify-center hover:bg-red-100 rounded flex-shrink-0 text-red-600" onclick="event.stopPropagation(); deleteTask('${task.id}')" title="删除任务">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                </button>
-            `;
-            
-            // Drag events for accordion tasks
-            div.addEventListener('dragstart', (e) => {
-                draggedTask = task;
-                div.classList.add('dragging');
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', task.id);
-            });
-            
-            div.addEventListener('dragend', (e) => {
-                div.classList.remove('dragging');
-                draggedTask = null;
-                // Remove hover states from all sections
-                document.querySelectorAll('.accordion-section-header').forEach(header => {
-                    header.classList.remove('drag-over-section');
-                });
-            });
-            
-            // Prevent drag when clicking buttons
-            const buttons = div.querySelectorAll('button');
-            buttons.forEach(btn => {
-                btn.addEventListener('mousedown', (e) => {
-                    e.stopPropagation();
-                });
-            });
-            
-            return div;
-        }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-        
-        function deleteTask(taskId) {
-            // Find the task and its calendar instances
-            const task = tasks.find(t => t.id === taskId);
-            const relatedCalendarTasks = calendarTasks.filter(ct => ct.taskId === taskId);
-            
-            if (task) {
-                // Save for undo
-                lastDeletedData = {
-                    task: {...task},
-                    calendarTasks: relatedCalendarTasks.map(ct => ({...ct}))
-                };
-                
-                // Remove task and calendar instances
-                tasks = tasks.filter(t => t.id !== taskId);
-                calendarTasks = calendarTasks.filter(ct => ct.taskId !== taskId);
-                
-                saveTasksToStorage();
-                renderTasks();
-                renderCalendarTasks();
-                showToastWithUndoDelete('任务已删除');
-            }
-        }
-        
-        // Section Drag & Drop Handlers
-        function handleSectionDragOver(e, section) {
-            if (draggedTask && !draggedCalendarTask) {
-                e.preventDefault();
-                e.currentTarget.classList.add('drag-over-section');
-            }
-        }
-        
-        function handleSectionDragLeave(e) {
-            e.currentTarget.classList.remove('drag-over-section');
-        }
-        
-        function handleSectionDrop(e, targetSection) {
-            e.preventDefault();
-            e.currentTarget.classList.remove('drag-over-section');
-            
-            if (draggedTask) {
-                // Move task to new section
-                const task = tasks.find(t => t.id === draggedTask.id);
-                if (task && task.section !== targetSection) {
-                    const oldSection = task.section;
-                    
-                    // Save calendar tasks for undo if moving to finished
-                    const relatedCalendarTasks = calendarTasks.filter(ct => ct.taskId === task.id);
-                    
-                    task.section = targetSection;
-                    
-                    // If moving to finished, remove from calendar
-                    if (targetSection === 'finished') {
-                        calendarTasks = calendarTasks.filter(ct => ct.taskId !== task.id);
-                    }
-                    
-                    // Save for undo
-                    lastMovedTask = {
-                        taskId: task.id,
-                        oldSection: oldSection,
-                        newSection: targetSection,
-                        calendarTasks: relatedCalendarTasks.map(ct => ({...ct}))
-                    };
-                    
-                    saveTasksToStorage();
-                    renderTasks();
-                    renderCalendarTasks();
-                    
-                    // Show toast with undo button if moved to finished
-                    if (targetSection === 'finished') {
-                        showToastWithUndo(`任务已移至${getSectionName(targetSection)}`);
-                    } else {
-                        showToast(`任务已移至${getSectionName(targetSection)}`);
-                    }
-                }
-            }
-        }
-        
-        function getSectionName(section) {
-            const names = {
-                'planning': '计划中',
-                'thisweek': '本周要务',
-                'finished': '已完成'
-            };
-            return names[section] || section;
-        }
-        
-        // Calendar Drag & Drop
-        function handleCalendarDragOver(e) {
-            e.preventDefault();
-            e.currentTarget.classList.add('drag-over');
-        }
-        
-        function handleCalendarDragLeave(e) {
-            e.currentTarget.classList.remove('drag-over');
-        }
-        
-        function handleCalendarDrop(e) {
-            e.preventDefault();
-            e.currentTarget.classList.remove('drag-over');
-            
-            const day = parseInt(e.currentTarget.dataset.day);
-            const hour = parseInt(e.currentTarget.dataset.hour);
-            
-            if (draggedTask) {
-                // Check how many tasks are already in this cell
-                const tasksInCell = calendarTasks.filter(ct => 
-                    ct.day === day && ct.hour === hour
-                );
-                
-                if (tasksInCell.length >= 2) {
-                    showToast('每个时间块最多只能放置2个任务');
-                    return;
-                }
-                
-                // Create a copy of the task in the calendar
-                const calendarTask = {
-                    id: Date.now().toString(),
-                    taskId: draggedTask.id,
-                    name: draggedTask.name,
-                    color: draggedTask.color,
-                    day,
-                    hour,
-                    position: tasksInCell.length // 0 for first, 1 for second
-                };
-                
-                calendarTasks.push(calendarTask);
-                saveTasksToStorage();
-                renderCalendarTasks();
-            } else if (draggedCalendarTask) {
-                // Check if moving to a new cell
-                if (draggedCalendarTask.day !== day || 
-                    draggedCalendarTask.hour !== hour) {
-                    
-                    // Check how many tasks are in target cell
-                    const tasksInTargetCell = calendarTasks.filter(ct => 
-                        ct.id !== draggedCalendarTask.id &&
-                        ct.day === day && ct.hour === hour
-                    );
-                    
-                    if (tasksInTargetCell.length >= 2) {
-                        showToast('每个时间块最多只能放置2个任务');
-                        renderCalendarTasks(); // Reset position
-                        return;
-                    }
-                    
-                    draggedCalendarTask.day = day;
-                    draggedCalendarTask.hour = hour;
-                    draggedCalendarTask.position = tasksInTargetCell.length;
-                }
-                
-                saveTasksToStorage();
-                renderCalendarTasks();
-            }
-        }
-        
-        function renderCalendarTasks() {
-            // Clear all calendar tasks
-            document.querySelectorAll('.calendar-task').forEach(el => el.remove());
-            
-            // Group tasks by cell (80px blocks)
-            const cellMap = new Map();
-            calendarTasks.forEach(ct => {
-                const key = `${ct.day}-${ct.hour}`;
-                if (!cellMap.has(key)) {
-                    cellMap.set(key, []);
-                }
-                cellMap.get(key).push(ct);
-            });
-            
-            // Render tasks
-            cellMap.forEach((tasks, key) => {
-                const [day, hour] = key.split('-').map(Number);
-                const block = document.querySelector(
-                    `.calendar-block[data-day="${day}"][data-hour="${hour}"]`
-                );
-                
-                if (block && tasks.length > 0) {
-                    // Sort by position
-                    tasks.sort((a, b) => (a.position || 0) - (b.position || 0));
-                    
-                    const taskCount = tasks.length;
-                    const taskHeight = taskCount === 1 ? '76px' : '36px'; // 80px cell - 4px padding
-                    
-                    tasks.forEach((ct, index) => {
-                        const taskEl = document.createElement('div');
-                        taskEl.className = 'calendar-task bg-white border border-slate-200 rounded flex items-center gap-1 px-2 cursor-move shadow-sm hover:shadow-md transition-shadow';
-                        taskEl.draggable = true;
-                        taskEl.style.height = taskHeight;
-                        taskEl.style.top = taskCount === 1 ? '2px' : `${2 + index * 40}px`;
-                        taskEl.title = `${ct.name}`;
-                        
-                        taskEl.innerHTML = `
-                            <div class="${colorMap[ct.color]} h-full w-1 flex-shrink-0 rounded-l"></div>
-                            <div class="flex items-center justify-center w-3 h-3 flex-shrink-0">
-                                <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <circle cx="12" cy="6" r="1" fill="currentColor"/>
-                                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
-                                    <circle cx="12" cy="18" r="1" fill="currentColor"/>
-                                </svg>
-                            </div>
-                            <div class="flex-1 text-xs text-gray-800 truncate">${escapeHtml(ct.name)}</div>
-                            <button class="close-button w-5 h-5 flex items-center justify-center hover:bg-red-50 rounded flex-shrink-0 text-gray-500 hover:text-red-600 transition-colors" title="移除" type="button">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        `;
-                        
-                        // Drag events for calendar tasks
-                        taskEl.addEventListener('dragstart', (e) => {
-                            draggedCalendarTask = ct;
-                            taskEl.style.opacity = '0.5';
-                            e.dataTransfer.effectAllowed = 'move';
-                        });
-                        
-                        taskEl.addEventListener('dragend', (e) => {
-                            taskEl.style.opacity = '1';
-                            draggedCalendarTask = null;
-                        });
-                        
-                        // Close button click handler
-                        const closeBtn = taskEl.querySelector('.close-button');
-                        closeBtn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            calendarTasks = calendarTasks.filter(t => t.id !== ct.id);
-                            // Reorder remaining tasks in this cell
-                            const remaining = calendarTasks.filter(t => 
-                                t.day === ct.day && t.hour === ct.hour
-                            );
-                            remaining.forEach((t, i) => t.position = i);
-                            saveTasksToStorage();
-                            renderCalendarTasks();
-                            showToast('已从日历移除');
-                        });
-                        
-                        // Prevent drag when clicking close button
-                        closeBtn.addEventListener('mousedown', (e) => {
-                            e.stopPropagation();
-                        });
-                        
-                        block.appendChild(taskEl);
-                    });
-                }
-            });
-        }
-        
-        // Storage
-        function saveTasksToStorage() {
-            localStorage.setItem('tasks', JSON.stringify(tasks));
-            localStorage.setItem('calendarTasks', JSON.stringify(calendarTasks));
-        }
-        
-        function loadTasksFromStorage() {
-            const storedTasks = localStorage.getItem('tasks');
-            const storedCalendarTasks = localStorage.getItem('calendarTasks');
-            
-            if (storedTasks) {
-                tasks = JSON.parse(storedTasks);
-            }
-            
-            if (storedCalendarTasks) {
-                calendarTasks = JSON.parse(storedCalendarTasks);
-            }
-        }
-        
-        // Toast Notification
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            toast.innerHTML = message;
-            toast.classList.add('show');
-            
-            if (undoTimeout) clearTimeout(undoTimeout);
-            undoTimeout = setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3000);
-        }
-        
-        function showToastWithUndo(message) {
-            const toast = document.getElementById('toast');
-            toast.innerHTML = `
-                <span>${message}</span>
-                <button onclick="undoTaskMove()" class="ml-4 px-3 py-1 bg-white text-gray-900 rounded hover:bg-gray-100 transition-colors text-sm font-medium">
-                    撤销
-                </button>
-            `;
-            toast.classList.add('show');
-            
-            if (undoTimeout) clearTimeout(undoTimeout);
-            undoTimeout = setTimeout(() => {
-                toast.classList.remove('show');
-                lastMovedTask = null;
-            }, 5000);
-        }
-        
-        function undoTaskMove() {
-            if (lastMovedTask) {
-                const task = tasks.find(t => t.id === lastMovedTask.taskId);
-                if (task) {
-                    task.section = lastMovedTask.oldSection;
-                    
-                    // Restore calendar tasks if they were removed
-                    if (lastMovedTask.calendarTasks && lastMovedTask.calendarTasks.length > 0) {
-                        lastMovedTask.calendarTasks.forEach(ct => {
-                            calendarTasks.push(ct);
-                        });
-                    }
-                    
-                    saveTasksToStorage();
-                    renderTasks();
-                    renderCalendarTasks();
-                    showToast('已撤销');
-                    lastMovedTask = null;
-                }
-            }
-            document.getElementById('toast').classList.remove('show');
-        }
-        
-        function showToastWithUndoDelete(message) {
-            const toast = document.getElementById('toast');
-            toast.innerHTML = `
-                <span>${message}</span>
-                <button onclick="undoTaskDelete()" class="ml-4 px-3 py-1 bg-white text-gray-900 rounded hover:bg-gray-100 transition-colors text-sm font-medium">
-                    撤销
-                </button>
-            `;
-            toast.classList.add('show');
-            
-            if (undoTimeout) clearTimeout(undoTimeout);
-            undoTimeout = setTimeout(() => {
-                toast.classList.remove('show');
-                lastDeletedData = null;
-            }, 5000);
-        }
-        
-        function undoTaskDelete() {
-            if (lastDeletedData) {
-                // Restore task
-                tasks.push(lastDeletedData.task);
-                
-                // Restore calendar tasks
-                if (lastDeletedData.calendarTasks && lastDeletedData.calendarTasks.length > 0) {
-                    lastDeletedData.calendarTasks.forEach(ct => {
-                        calendarTasks.push(ct);
-                    });
-                }
-                
-                saveTasksToStorage();
-                renderTasks();
-                renderCalendarTasks();
-                showToast('已撤销');
-                lastDeletedData = null;
-            }
-            document.getElementById('toast').classList.remove('show');
-        }
-    </script>
-</body>
-</html>
+这份指南将帮助您配置Supabase后端，实现多设备数据同步和多用户支持。
+
+---
+
+## 📋 目录
+
+1. [创建Supabase账号](#1-创建supabase账号)
+2. [创建新项目](#2-创建新项目)
+3. [设置数据库](#3-设置数据库)
+4. [配置Google OAuth](#4-配置google-oauth)
+5. [获取API密钥](#5-获取api密钥)
+6. [更新前端代码](#6-更新前端代码)
+7. [测试应用](#7-测试应用)
+8. [故障排除](#8-故障排除)
+
+---
+
+## 1. 创建Supabase账号
+
+1. 访问 [https://supabase.com](https://supabase.com)
+2. 点击 **"Start your project"** 或 **"Sign Up"**
+3. 使用GitHub账号登录（推荐）或使用邮箱注册
+4. 完成账号创建
+
+---
+
+## 2. 创建新项目
+
+1. 登录后，点击 **"New Project"**
+2. 选择您的组织（如果没有，会自动创建）
+3. 填写项目信息：
+   - **Name**: `week-plan` 或您喜欢的名称
+   - **Database Password**: 设置一个强密码（请保存好！）
+   - **Region**: 选择 **Northeast Asia (Tokyo)** （距离中国最近）
+   - **Pricing Plan**: 选择 **Free** （免费版）
+4. 点击 **"Create new project"**
+5. 等待2-3分钟，项目初始化完成
+
+---
+
+## 3. 设置数据库
+
+### 3.1 创建表
+
+1. 在左侧菜单中，点击 **"Table Editor"**
+2. 点击 **"Create a new table"**
+3. 配置表：
+   - **Name**: `user_tasks`
+   - **Description**: `用户任务数据`
+   - **Enable Row Level Security (RLS)**: ✅ **勾选**
+
+### 3.2 添加列
+
+保留默认的 `id` 和 `created_at` 列，然后添加以下列：
+
+| Column Name | Type | Default Value | Additional Settings |
+|------------|------|---------------|-------------------|
+| `user_id` | `uuid` | - | ✅ Is Nullable: 取消勾选 |
+| `tasks` | `jsonb` | `[]` | ✅ Is Nullable: 勾选 |
+| `calendar_tasks` | `jsonb` | `[]` | ✅ Is Nullable: 勾选 |
+| `updated_at` | `timestamptz` | `now()` | ✅ Is Nullable: 勾选 |
+
+### 3.3 设置主键和唯一约束
+
+1. 点击表名旁的 ⚙️ **"Settings"**
+2. 添加唯一约束：
+   - 点击 **"Add Unique Constraint"**
+   - 选择 `user_id` 列
+   - 点击 **"Save"**
+
+### 3.4 配置行级安全(RLS)策略
+
+非常重要！这确保用户只能访问自己的数据。
+
+#### 方法1：使用SQL编辑器（推荐）
+
+1. 在左侧菜单中，点击 **"SQL Editor"**
+2. 点击 **"New query"**
+3. 粘贴以下SQL代码：
+
+```sql
+-- 创建策略：允许用户读取自己的数据
+CREATE POLICY "Users can read own tasks" ON user_tasks
+    FOR SELECT
+    USING (auth.uid() = user_id);
+
+-- 创建策略：允许用户插入自己的数据
+CREATE POLICY "Users can insert own tasks" ON user_tasks
+    FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+-- 创建策略：允许用户更新自己的数据
+CREATE POLICY "Users can update own tasks" ON user_tasks
+    FOR UPDATE
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+-- 创建策略：允许用户删除自己的数据
+CREATE POLICY "Users can delete own tasks" ON user_tasks
+    FOR DELETE
+    USING (auth.uid() = user_id);
+```
+
+4. 点击 **"Run"** 执行SQL
+5. 确认显示 **"Success"**
+
+#### 方法2：使用UI界面
+
+1. 在 **Table Editor** 中，选择 `user_tasks` 表
+2. 点击 **"Policies"** 标签
+3. 点击 **"New Policy"**
+4. 选择 **"Create a policy from scratch"**
+5. 重复以下步骤4次（SELECT, INSERT, UPDATE, DELETE）：
+
+**SELECT Policy:**
+- Policy Name: `Users can read own tasks`
+- Target roles: `public`
+- Command: `SELECT`
+- USING expression: `auth.uid() = user_id`
+
+**INSERT Policy:**
+- Policy Name: `Users can insert own tasks`
+- Target roles: `public`
+- Command: `INSERT`
+- WITH CHECK expression: `auth.uid() = user_id`
+
+**UPDATE Policy:**
+- Policy Name: `Users can update own tasks`
+- Target roles: `public`
+- Command: `UPDATE`
+- USING expression: `auth.uid() = user_id`
+- WITH CHECK expression: `auth.uid() = user_id`
+
+**DELETE Policy:**
+- Policy Name: `Users can delete own tasks`
+- Target roles: `public`
+- Command: `DELETE`
+- USING expression: `auth.uid() = user_id`
+
+---
+
+## 4. 配置Google OAuth
+
+### 4.1 创建Google OAuth凭据
+
+1. 访问 [Google Cloud Console](https://console.cloud.google.com/)
+2. 创建新项目或选择现有项目
+3. 启用 **Google+ API**：
+   - 搜索 "Google+ API"
+   - 点击 **"Enable"**
+4. 创建OAuth凭据：
+   - 左侧菜单 → **APIs & Services** → **Credentials**
+   - 点击 **"Create Credentials"** → **"OAuth client ID"**
+   - Application type: **Web application**
+   - Name: `Week Plan`
+   - Authorized redirect URIs（非常重要！）：
+     - 回到Supabase，左侧菜单 → **Authentication** → **Providers**
+     - 找到 **Google** 提供商
+     - 复制 **"Callback URL (for OAuth)"**（类似：`https://xxx.supabase.co/auth/v1/callback`）
+     - 粘贴到Google Console的"Authorized redirect URIs"
+   - 点击 **"Create"**
+5. 复制生成的：
+   - **Client ID**
+   - **Client Secret**
+
+### 4.2 在Supabase中配置Google
+
+1. 在Supabase，左侧菜单 → **Authentication** → **Providers**
+2. 找到 **Google**，点击展开
+3. 打开 **"Enable Sign in with Google"** 开关
+4. 填入：
+   - **Client ID**: 粘贴Google的Client ID
+   - **Client Secret**: 粘贴Google的Client Secret
+5. 点击 **"Save"**
+
+---
+
+## 5. 获取API密钥
+
+1. 在Supabase，左侧菜单 → **Settings** → **API**
+2. 找到以下信息：
+   - **Project URL** (例如: `https://xxxxx.supabase.co`)
+   - **anon public** key (以 `eyJ` 开头的长字符串)
+3. **复制这两个值，接下来要用**
+
+---
+
+## 6. 更新前端代码
+
+1. 打开 `index.htmlu` 文件
+2. 找到第594-595行（在 `<script>` 标签内）：
+
+```javascript
+const SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE'
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY_HERE'
+```
+
+3. 替换为您的实际值：
+
+```javascript
+const SUPABASE_URL = 'https://xxxxx.supabase.co'  // 替换为您的Project URL
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'  // 替换为您的anon key
+```
+
+4. 保存文件
+
+---
+
+## 7. 测试应用
+
+### 7.1 本地测试
+
+1. 在浏览器中打开 `index.html`
+2. 检查浏览器控制台（F12），应该看到：
+   ```
+   ✅ Supabase initialized
+   ```
+3. 点击 **"登录"** 按钮
+4. 尝试以下登录方式：
+
+#### 测试邮箱登录：
+1. 点击 **"注册"**
+2. 输入邮箱和密码（至少6位）
+3. 点击 **"注册"**
+4. 检查邮箱，点击验证链接
+5. 返回应用，点击 **"登录"**
+6. 使用相同的邮箱和密码登录
+
+#### 测试Google登录：
+1. 点击 **"使用 Google 登录"**
+2. 选择Google账号
+3. 允许授权
+4. 应该自动返回应用并登录成功
+
+### 7.2 验证功能
+
+登录成功后，应该看到：
+- ✅ 左侧面板显示用户头像和邮箱
+- ✅ 显示 **"同步"** 和 **"登出"** 按钮
+- ✅ 可以创建任务
+- ✅ 任务自动保存到云端
+
+### 7.3 测试跨设备同步
+
+1. 在第一个设备上创建一些任务
+2. 在第二个设备（或浏览器隐身模式）打开应用
+3. 使用相同账号登录
+4. 应该看到相同的任务数据！
+
+---
+
+## 8. 故障排除
+
+### ❌ 控制台显示 "Supabase not configured"
+
+**原因**: 未正确配置API密钥
+
+**解决方案**:
+- 检查 `SUPABASE_URL` 和 `SUPABASE_ANON_KEY` 是否正确
+- 确保没有多余的空格或引号
+- 保存文件后刷新浏览器
+
+---
+
+### ❌ Google登录失败 "redirect_uri_mismatch"
+
+**原因**: Google Console中的重定向URI配置错误
+
+**解决方案**:
+1. 回到Supabase → **Authentication** → **Providers** → **Google**
+2. 复制完整的 "Callback URL"
+3. 回到Google Console → **Credentials**
+4. 编辑OAuth客户端
+5. 确保 "Authorized redirect URIs" **完全匹配** Supabase的Callback URL
+6. 保存后等待5分钟再测试
+
+---
+
+### ❌ 邮箱注册后无法登录
+
+**原因**: 邮箱未验证
+
+**解决方案**:
+1. 检查邮箱的垃圾邮件文件夹
+2. 找到Supabase发送的验证邮件
+3. 点击验证链接
+4. 返回应用重新登录
+
+如果没收到邮件：
+1. Supabase → **Authentication** → **Providers** → **Email**
+2. 检查 "Confirm email" 是否开启
+3. 可以暂时关闭以便测试（不推荐生产环境）
+
+---
+
+### ❌ RLS错误 "new row violates row-level security policy"
+
+**原因**: RLS策略配置错误
+
+**解决方案**:
+1. 重新执行第3.4节的SQL命令
+2. 或者在 Supabase → **Table Editor** → `user_tasks` → **Policies**
+3. 确保所有4个策略（SELECT, INSERT, UPDATE, DELETE）都已创建
+4. 检查策略的表达式是否为 `auth.uid() = user_id`
+
+---
+
+### ❌ 数据没有同步
+
+**原因**: 浏览器缓存或网络问题
+
+**解决方案**:
+1. 点击 **"同步"** 按钮手动同步
+2. 检查浏览器控制台是否有错误
+3. 刷新页面 (F5)
+4. 检查 Supabase → **Table Editor** → `user_tasks`，确认数据已保存
+
+---
+
+## 🎉 完成！
+
+恭喜！您已经成功配置了Supabase后端。现在您的应用支持：
+
+✅ **用户认证** (Google + 邮箱/密码)
+✅ **多用户隔离** (每个用户只能看到自己的数据)
+✅ **跨设备同步** (在任何设备登录都能看到数据)
+✅ **云端备份** (数据安全存储在Supabase)
+✅ **免费使用** (Supabase免费版非常慷慨)
+
+---
+
+## 📊 免费版限额
+
+Supabase免费版提供：
+- ✅ 500MB 数据库存储
+- ✅ 50,000 月活跃用户
+- ✅ 2GB 带宽/月
+- ✅ 社区支持
+
+对于个人使用或小型团队，免费版完全够用！
+
+---
+
+## 🚀 下一步（可选）
+
+### 部署到Vercel（免费托管）
+
+1. 访问 [vercel.com](https://vercel.com)
+2. 注册并连接GitHub
+3. 创建新仓库，上传 `index.html`
+4. 在Vercel导入仓库
+5. 部署完成后，您将获得一个公开URL
+6. 记得更新Google OAuth的重定向URI！
+
+### 添加实时同步（高级）
+
+如果您想要多设备实时同步（不需要点击"同步"按钮），可以添加：
+
+```javascript
+// 在 script 中添加
+if (supabase) {
+    supabase
+        .channel('tasks-changes')
+        .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'user_tasks',
+            filter: `user_id=eq.${currentUser?.id}`
+        }, (payload) => {
+            console.log('数据更新！', payload)
+            loadDataFromSupabase()
+        })
+        .subscribe()
+}
+```
+
+---
+
+## 💡 需要帮助？
+
+如果遇到任何问题：
+
+1. 检查浏览器控制台 (F12) 查看错误信息
+2. 查看Supabase文档: [https://supabase.com/docs](https://supabase.com/docs)
+3. 联系我获取更多帮助
+
+---
+
+**祝您使用愉快！** 🎉✨
 
