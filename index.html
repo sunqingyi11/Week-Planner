@@ -837,14 +837,25 @@
                 if (data) {
                     tasks = data.tasks || []
                     calendarTasks = data.calendar_tasks || []
+                    console.log('✅ 从Supabase加载数据:', {
+                        tasks: tasks.length,
+                        calendarTasks: calendarTasks.length
+                    })
                     renderTasks()
                     renderCalendarTasks()
                     showToast('数据已同步')
+                } else {
+                    console.log('ℹ️ Supabase没有数据，初始化为空')
+                    tasks = []
+                    calendarTasks = []
+                    renderTasks()
+                    renderCalendarTasks()
                 }
             } catch (error) {
                 console.error('Load data error:', error)
                 showToast('加载数据失败，使用本地数据')
                 loadTasksFromStorage() // Fallback
+                renderCalendarTasks() // 确保渲染日历任务
             }
         }
         
@@ -915,7 +926,12 @@
             // Check auth state first
             await checkAuthState();
             
-            renderTasks();
+            // Render tasks and calendar (loadDataFromSupabase already calls these if logged in)
+            // But call again to ensure they render even if not logged in
+            if (!currentUser) {
+                renderTasks();
+                renderCalendarTasks();
+            }
             
             // Hide loading screen
             setTimeout(() => {
