@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>任务管理 - Week Plan</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         
@@ -229,6 +230,47 @@
         
         <!-- Accordion Sidebar -->
         <div class="w-80 bg-white border-r border-slate-200 flex flex-col h-screen">
+            <!-- User Section -->
+            <div id="userSection" class="border-b border-slate-200 flex-shrink-0">
+                <!-- Logged Out State -->
+                <div id="loggedOutState" class="px-6 py-6 space-y-3">
+                    <div class="text-sm text-gray-600 mb-4">
+                        <p class="font-medium text-black mb-1">欢迎使用任务管理器</p>
+                        <p class="text-xs">登录后可在多设备间同步您的任务</p>
+                    </div>
+                    <button onclick="showLoginModal()" class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors">
+                        登录
+                    </button>
+                    <button onclick="showSignupModal()" class="w-full border border-slate-200 text-slate-900 text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-50 transition-colors">
+                        注册
+                    </button>
+                </div>
+                
+                <!-- Logged In State -->
+                <div id="loggedInState" class="px-6 py-6 hidden">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div id="userAvatar" class="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm">
+                            U
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div id="userName" class="text-sm font-medium text-black truncate">用户名</div>
+                            <div id="userEmail" class="text-xs text-gray-500 truncate">user@example.com</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="syncData()" class="flex-1 border border-slate-200 text-slate-700 text-xs font-medium px-3 py-2 rounded-md hover:bg-slate-50 transition-colors flex items-center justify-center gap-1" title="同步数据">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            同步
+                        </button>
+                        <button onclick="signOut()" class="flex-1 border border-red-200 text-red-600 text-xs font-medium px-3 py-2 rounded-md hover:bg-red-50 transition-colors">
+                            登出
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Planning Section -->
             <div id="planningSection" class="border-b border-slate-200 flex flex-col accordion-section flex-1 min-h-0">
                 <div class="flex items-center justify-between px-6 accordion-section-header flex-shrink-0 h-[60px]" 
@@ -400,8 +442,170 @@
     
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
+    
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div class="px-6 py-5 border-b border-slate-200">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-semibold text-black">登录</h2>
+                    <button onclick="closeLoginModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+                <!-- Google OAuth -->
+                <button onclick="signInWithGoogle()" class="w-full border border-slate-200 text-slate-700 text-sm font-medium px-4 py-2.5 rounded-md hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    使用 Google 登录
+                </button>
+                
+                <div class="relative">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-slate-200"></div>
+                    </div>
+                    <div class="relative flex justify-center text-xs">
+                        <span class="px-2 bg-white text-gray-500">或使用邮箱</span>
+                    </div>
+                </div>
+                
+                <!-- Email/Password Form -->
+                <form id="loginForm" onsubmit="signInWithEmail(event)" class="space-y-4">
+                    <div>
+                        <label class="text-sm font-medium text-black block mb-1">邮箱</label>
+                        <input 
+                            type="email" 
+                            id="loginEmail" 
+                            required
+                            placeholder="your@email.com"
+                            class="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        />
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-black block mb-1">密码</label>
+                        <input 
+                            type="password" 
+                            id="loginPassword" 
+                            required
+                            placeholder="••••••••"
+                            class="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        />
+                    </div>
+                    <button 
+                        type="submit" 
+                        class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors"
+                    >
+                        登录
+                    </button>
+                </form>
+                
+                <p class="text-xs text-center text-gray-500">
+                    还没有账号？ <button onclick="closeLoginModal(); showSignupModal()" class="text-slate-900 font-medium hover:underline">立即注册</button>
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Signup Modal -->
+    <div id="signupModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div class="px-6 py-5 border-b border-slate-200">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-semibold text-black">注册</h2>
+                    <button onclick="closeSignupModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+                <!-- Google OAuth -->
+                <button onclick="signInWithGoogle()" class="w-full border border-slate-200 text-slate-700 text-sm font-medium px-4 py-2.5 rounded-md hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    使用 Google 注册
+                </button>
+                
+                <div class="relative">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-slate-200"></div>
+                    </div>
+                    <div class="relative flex justify-center text-xs">
+                        <span class="px-2 bg-white text-gray-500">或使用邮箱</span>
+                    </div>
+                </div>
+                
+                <!-- Email/Password Form -->
+                <form id="signupForm" onsubmit="signUpWithEmail(event)" class="space-y-4">
+                    <div>
+                        <label class="text-sm font-medium text-black block mb-1">邮箱</label>
+                        <input 
+                            type="email" 
+                            id="signupEmail" 
+                            required
+                            placeholder="your@email.com"
+                            class="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        />
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-black block mb-1">密码</label>
+                        <input 
+                            type="password" 
+                            id="signupPassword" 
+                            required
+                            placeholder="至少6位字符"
+                            minlength="6"
+                            class="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        />
+                    </div>
+                    <button 
+                        type="submit" 
+                        class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors"
+                    >
+                        注册
+                    </button>
+                </form>
+                
+                <p class="text-xs text-center text-gray-500">
+                    已有账号？ <button onclick="closeSignupModal(); showLoginModal()" class="text-slate-900 font-medium hover:underline">立即登录</button>
+                </p>
+            </div>
+        </div>
+    </div>
 
     <script>
+        // =================================================================
+        // SUPABASE CONFIGURATIONss
+        // =================================================================
+        // TODO: Replace these with your actual Supabase credentials
+        const SUPABASE_URL = 'https://wzjxtzpxojbmhwxropio.supabase.co'
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6anh0enB4b2pibWh3eHJvcGlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwNjQ3ODgsImV4cCI6MjA3NTY0MDc4OH0.lImwPZn-ca-d4oVWpQ5FUtXdM_NBvdkplqh1hUk3stQ'
+        
+        // Initialize Supabase client (will be null if credentials not set)
+        let supabase = null
+        let currentUser = null
+        
+        // Check if credentials are configured
+        if (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE') {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+            console.log('✅ Supabase initialized')
+        } else {
+            console.warn('⚠️ Supabase not configured. Using localStorage only.')
+        }
+        
         // Global State
         let tasks = [];
         let calendarTasks = [];
@@ -427,11 +631,277 @@
             '7 PM', '8 PM', '9 PM', 'Night'
         ];
         
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
+        // =================================================================
+        // AUTHENTICATION FUNCTIONS
+        // =================================================================
+        
+        // Check authentication state on page load
+        async function checkAuthState() {
+            if (!supabase) {
+                // No Supabase configured, stay logged out
+                updateUIForLoggedOut()
+                return
+            }
+            
+            try {
+                const { data: { user } } = await supabase.auth.getUser()
+                if (user) {
+                    currentUser = user
+                    updateUIForLoggedIn(user)
+                    await loadDataFromSupabase()
+                } else {
+                    updateUIForLoggedOut()
+                    loadTasksFromStorage() // Fallback to localStorage
+                }
+            } catch (error) {
+                console.error('Auth check error:', error)
+                updateUIForLoggedOut()
+                loadTasksFromStorage()
+            }
+        }
+        
+        // Update UI for logged in state
+        function updateUIForLoggedIn(user) {
+            document.getElementById('loggedOutState').classList.add('hidden')
+            document.getElementById('loggedInState').classList.remove('hidden')
+            
+            // Set user info
+            document.getElementById('userName').textContent = user.user_metadata?.name || user.email?.split('@')[0] || '用户'
+            document.getElementById('userEmail').textContent = user.email
+            
+            // Set avatar initial
+            const initial = (user.user_metadata?.name || user.email || 'U')[0].toUpperCase()
+            document.getElementById('userAvatar').textContent = initial
+        }
+        
+        // Update UI for logged out state
+        function updateUIForLoggedOut() {
+            document.getElementById('loggedOutState').classList.remove('hidden')
+            document.getElementById('loggedInState').classList.add('hidden')
+        }
+        
+        // Modal controls
+        function showLoginModal() {
+            document.getElementById('loginModal').classList.remove('hidden')
+        }
+        
+        function closeLoginModal() {
+            document.getElementById('loginModal').classList.add('hidden')
+            document.getElementById('loginForm').reset()
+        }
+        
+        function showSignupModal() {
+            document.getElementById('signupModal').classList.remove('hidden')
+        }
+        
+        function closeSignupModal() {
+            document.getElementById('signupModal').classList.add('hidden')
+            document.getElementById('signupForm').reset()
+        }
+        
+        // Google OAuth Sign In
+        async function signInWithGoogle() {
+            if (!supabase) {
+                alert('请先配置 Supabase 凭据')
+                return
+            }
+            
+            try {
+                const { data, error } = await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                        redirectTo: window.location.origin
+                    }
+                })
+                
+                if (error) throw error
+                // OAuth will redirect, no need to handle response here
+            } catch (error) {
+                console.error('Google sign in error:', error)
+                alert('Google 登录失败: ' + error.message)
+            }
+        }
+        
+        // Email/Password Sign In
+        async function signInWithEmail(event) {
+            event.preventDefault()
+            
+            if (!supabase) {
+                alert('请先配置 Supabase 凭据')
+                return
+            }
+            
+            const email = document.getElementById('loginEmail').value
+            const password = document.getElementById('loginPassword').value
+            
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                })
+                
+                if (error) throw error
+                
+                currentUser = data.user
+                updateUIForLoggedIn(data.user)
+                closeLoginModal()
+                await loadDataFromSupabase()
+                showToast('登录成功')
+            } catch (error) {
+                console.error('Email sign in error:', error)
+                alert('登录失败: ' + error.message)
+            }
+        }
+        
+        // Email/Password Sign Up
+        async function signUpWithEmail(event) {
+            event.preventDefault()
+            
+            if (!supabase) {
+                alert('请先配置 Supabase 凭据')
+                return
+            }
+            
+            const email = document.getElementById('signupEmail').value
+            const password = document.getElementById('signupPassword').value
+            
+            try {
+                const { data, error } = await supabase.auth.signUp({
+                    email: email,
+                    password: password
+                })
+                
+                if (error) throw error
+                
+                closeSignupModal()
+                alert('注册成功！请检查您的邮箱以验证账号。')
+            } catch (error) {
+                console.error('Sign up error:', error)
+                alert('注册失败: ' + error.message)
+            }
+        }
+        
+        // Sign Out
+        async function signOut() {
+            if (!supabase) return
+            
+            try {
+                const { error } = await supabase.auth.signOut()
+                if (error) throw error
+                
+                currentUser = null
+                tasks = []
+                calendarTasks = []
+                updateUIForLoggedOut()
+                renderTasks()
+                renderCalendarTasks()
+                showToast('已登出')
+            } catch (error) {
+                console.error('Sign out error:', error)
+                alert('登出失败: ' + error.message)
+            }
+        }
+        
+        // =================================================================
+        // DATA SYNC FUNCTIONS
+        // =================================================================
+        
+        // Load data from Supabase
+        async function loadDataFromSupabase() {
+            if (!supabase || !currentUser) return
+            
+            try {
+                const { data, error } = await supabase
+                    .from('user_tasks')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .single()
+                
+                if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+                    throw error
+                }
+                
+                if (data) {
+                    tasks = data.tasks || []
+                    calendarTasks = data.calendar_tasks || []
+                    renderTasks()
+                    renderCalendarTasks()
+                    showToast('数据已同步')
+                }
+            } catch (error) {
+                console.error('Load data error:', error)
+                showToast('加载数据失败，使用本地数据')
+                loadTasksFromStorage() // Fallback
+            }
+        }
+        
+        // Save data to Supabase
+        async function saveDataToSupabase() {
+            if (!supabase || !currentUser) {
+                saveTasksToStorage() // Fallback to localStorage
+                return
+            }
+            
+            try {
+                const { data, error } = await supabase
+                    .from('user_tasks')
+                    .upsert({
+                        user_id: currentUser.id,
+                        tasks: tasks,
+                        calendar_tasks: calendarTasks,
+                        updated_at: new Date().toISOString()
+                    }, {
+                        onConflict: 'user_id'
+                    })
+                
+                if (error) throw error
+                
+                // Also save to localStorage as backup
+                saveTasksToStorage()
+            } catch (error) {
+                console.error('Save data error:', error)
+                // Fallback to localStorage
+                saveTasksToStorage()
+            }
+        }
+        
+        // Manual sync button
+        async function syncData() {
+            if (!supabase || !currentUser) {
+                alert('请先登录')
+                return
+            }
+            
+            await saveDataToSupabase()
+            await loadDataFromSupabase()
+        }
+        
+        // Listen for auth state changes
+        if (supabase) {
+            supabase.auth.onAuthStateChange((event, session) => {
+                console.log('Auth state changed:', event)
+                if (event === 'SIGNED_IN' && session?.user) {
+                    currentUser = session.user
+                    updateUIForLoggedIn(session.user)
+                    loadDataFromSupabase()
+                } else if (event === 'SIGNED_OUT') {
+                    currentUser = null
+                    updateUIForLoggedOut()
+                }
+            })
+        }
+        
+        // =================================================================
+        // INITIALIZE
+        // =================================================================
+        
+        document.addEventListener('DOMContentLoaded', async () => {
             initializeWeekDates();
             generateCalendarGrid();
-            loadTasksFromStorage();
+            
+            // Check auth state first
+            await checkAuthState();
+            
             renderTasks();
             
             // Keyboard shortcuts
@@ -622,7 +1092,7 @@
                 tasks.push(newTask);
             }
             
-            saveTasksToStorage();
+            saveDataToSupabase();
             renderTasks();
             closeDrawer();
             showToast(taskId ? '任务已更新' : '任务已创建');
