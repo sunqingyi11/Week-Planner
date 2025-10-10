@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任务管理 - Week Plan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', 'PingFang SC', sans-serif;
+        }
+        
+        .dragging {
+            opacity: 0.5;
+        }
+        
+        .drag-over {
+            background-color: rgba(59, 130, 246, 0.1) !important;
+        }
+        
+        .task-card {
+            cursor: grab;
+            transition: all 0.2s ease;
+        }
+        
+        .task-card:active {
+            cursor: grabbing;
+        }
+        
+        .task-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .calendar-block {
+            min-height: 40px;
+            position: relative;
+        }
+        
+        .calendar-task {
+            position: absolute;
+            width: calc(100% - 4px);
+            left: 2px;
+            z-index: 10;
+        }
+        
+        .calendar-task .close-button {
+            opacity: 0;
+            transition: opacity 0.2s ease, background-color 0.2s ease;
+            z-index: 20;
+            pointer-events: all;
+        }
+        
+        .calendar-task:hover .close-button {
+            opacity: 1;
+        }
+        
+        .close-button {
+            cursor: pointer;
+        }
+        
+        /* Accordion sections - collapsed state */
+        .accordion-section {
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+        
+        .accordion-section:not(.flex-1) {
+            height: 60px;
+        }
+        
+        .drawer {
+            transition: transform 0.3s ease;
+        }
+        
+        .drawer-open {
+            transform: translateX(0);
+        }
+        
+        .drawer-closed {
+            transform: translateX(-100%);
+        }
+        
+        .color-option {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .color-option:hover {
+            transform: scale(1.2);
+        }
+        
+        .color-option.selected {
+            width: 24px;
+            height: 24px;
+            box-shadow: 0 0 0 2px white, 0 0 0 4px currentColor;
+        }
+        
+        .accordion-section-header {
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        .accordion-section-header:hover {
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+        
+        .accordion-section-header.drag-over-section {
+            background-color: rgba(59, 130, 246, 0.1);
+            border-left: 3px solid #3b82f6;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #1f2937;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .toast.show {
+            opacity: 1;
+        }
+        
+        .edit-button {
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .task-card:hover .edit-button {
+            opacity: 1;
+        }
+        
+        .calendar-container {
+            overflow: auto;
+            height: calc(100vh - 32px);
+        }
+    </style>
+</head>
+<body class="bg-white">
+    <!-- Backdrop Overlay -->
+    <div id="drawerBackdrop" class="fixed inset-0 bg-black bg-opacity-30 z-40 hidden transition-opacity" onclick="closeDrawer()"></div>
+    
+    <!-- Main Container -->
+    <div class="flex h-screen">
+        <!-- Drawer (Initially Hidden) -->
+        <div id="drawer" class="drawer drawer-closed fixed left-0 top-0 h-full w-[400px] bg-white border-r border-slate-200 shadow-lg z-50">
+            <div class="flex flex-col h-full p-8 gap-6">
+                <!-- Header -->
+                <div class="flex items-center justify-between">
+                    <h2 id="drawerTitle" class="text-xl font-medium text-black">添加任务</h2>
+                    <button onclick="closeDrawer()" class="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded">
+                        <svg class="w-6 h-6 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- Form -->
+                <form id="taskForm" class="flex flex-col gap-4 flex-1">
+                    <input type="hidden" id="taskId" value="">
+                    
+                    <!-- Name Field -->
+                    <div class="flex flex-col gap-1">
+                        <label class="text-sm font-medium text-black">
+                            名称 <span class="text-red-500">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="taskName" 
+                            placeholder="请输入" 
+                            required
+                            class="border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        />
+                    </div>
+                    
+                    <!-- Quadrant Field -->
+                    <div class="flex flex-col gap-1">
+                        <label class="text-sm font-medium text-black">象限</label>
+                        <select 
+                            id="taskQuadrant" 
+                            class="border border-slate-200 rounded-md px-3 py-2 text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        >
+                            <option value="重要不紧急">重要不紧急</option>
+                            <option value="重要紧急">重要紧急</option>
+                            <option value="不重要但紧急">不重要但紧急</option>
+                            <option value="不重要不紧急">不重要不紧急</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Color Field -->
+                    <div class="flex flex-col gap-1">
+                        <label class="text-sm font-medium text-black">颜色</label>
+                        <div class="flex gap-6 py-2 flex-wrap">
+                            <div class="color-option selected bg-violet-500" data-color="violet" onclick="selectColor('violet')"></div>
+                            <div class="color-option bg-yellow-500" data-color="yellow" onclick="selectColor('yellow')"></div>
+                            <div class="color-option bg-cyan-500" data-color="cyan" onclick="selectColor('cyan')"></div>
+                            <div class="color-option bg-emerald-500" data-color="emerald" onclick="selectColor('emerald')"></div>
+                            <div class="color-option bg-amber-500" data-color="amber" onclick="selectColor('amber')"></div>
+                            <div class="color-option bg-rose-500" data-color="rose" onclick="selectColor('rose')"></div>
+                        </div>
+                        <input type="hidden" id="taskColor" value="violet">
+                    </div>
+                    
+                    <!-- Save Button -->
+                    <div class="mt-auto">
+                        <button 
+                            type="submit" 
+                            class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors"
+                        >
+                            保存
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Accordion Sidebar -->
+        <div class="w-80 bg-white border-r border-slate-200 flex flex-col h-screen">
+            <!-- Planning Section -->
+            <div id="planningSection" class="border-b border-slate-200 flex flex-col accordion-section flex-1 min-h-0">
+                <div class="flex items-center justify-between px-6 accordion-section-header flex-shrink-0 h-[60px]" 
+                     onclick="toggleSection('planning')"
+                     ondragover="handleSectionDragOver(event, 'planning')"
+                     ondragleave="handleSectionDragLeave(event)"
+                     ondrop="handleSectionDrop(event, 'planning')">
+                    <h3 class="text-xl font-medium text-black">计划中 (<span id="planningCount">0</span>)</h3>
+                    <svg id="planningChevron" class="w-6 h-6 transform rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </div>
+                <div id="planningContent" class="px-6 pb-6 space-y-6 overflow-y-auto flex-1">
+                    <!-- Empty State -->
+                    <div id="emptyState" class="flex items-center justify-center py-32">
+                        <button onclick="openDrawer('create')" class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            添加任务
+                        </button>
+                    </div>
+                    <!-- Task Sections -->
+                    <div id="taskSections" class="space-y-6 hidden pb-4">
+                        <button onclick="openDrawer('create')" class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 mb-4">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            添加任务
+                        </button>
+                        <div id="quadrant-重要不紧急" class="space-y-4">
+                            <div class="text-xs text-gray-500 font-medium">重要不紧急</div>
+                            <div class="space-y-2 task-list min-h-[20px]"></div>
+                        </div>
+                        <div id="quadrant-重要紧急" class="space-y-4">
+                            <div class="text-xs text-gray-500 font-medium">重要紧急</div>
+                            <div class="space-y-2 task-list min-h-[20px]"></div>
+                        </div>
+                        <div id="quadrant-不重要但紧急" class="space-y-4">
+                            <div class="text-xs text-gray-500 font-medium">不重要但紧急</div>
+                            <div class="space-y-2 task-list min-h-[20px]"></div>
+                        </div>
+                        <div id="quadrant-不重要不紧急" class="space-y-4">
+                            <div class="text-xs text-gray-500 font-medium">不重要不紧急</div>
+                            <div class="space-y-2 task-list min-h-[20px]"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- This Week Section -->
+            <div id="thisweekSection" class="border-b border-slate-200 flex flex-col accordion-section">
+                <div class="flex items-center justify-between px-6 accordion-section-header flex-shrink-0 h-[60px]" 
+                     onclick="toggleSection('thisweek')"
+                     ondragover="handleSectionDragOver(event, 'thisweek')"
+                     ondragleave="handleSectionDragLeave(event)"
+                     ondrop="handleSectionDrop(event, 'thisweek')">
+                    <h3 class="text-xl font-medium text-black">本周要务 (<span id="thisweekCount">0</span>)</h3>
+                    <svg id="thisweekChevron" class="w-6 h-6 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </div>
+                <div id="thisweekContent" class="px-6 pb-6 space-y-6 hidden overflow-y-auto flex-1">
+                    <!-- Quadrant sections always visible -->
+                    <div id="thisweek-quadrant-重要不紧急" class="space-y-4">
+                        <div class="text-xs text-gray-500 font-medium">重要不紧急</div>
+                        <div class="space-y-2 thisweek-task-list min-h-[20px]"></div>
+                    </div>
+                    <div id="thisweek-quadrant-重要紧急" class="space-y-4">
+                        <div class="text-xs text-gray-500 font-medium">重要紧急</div>
+                        <div class="space-y-2 thisweek-task-list min-h-[20px]"></div>
+                    </div>
+                    <div id="thisweek-quadrant-不重要但紧急" class="space-y-4">
+                        <div class="text-xs text-gray-500 font-medium">不重要但紧急</div>
+                        <div class="space-y-2 thisweek-task-list min-h-[20px]"></div>
+                    </div>
+                    <div id="thisweek-quadrant-不重要不紧急" class="space-y-4">
+                        <div class="text-xs text-gray-500 font-medium">不重要不紧急</div>
+                        <div class="space-y-2 thisweek-task-list min-h-[20px]"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Finished Section -->
+            <div id="finishedSection" class="border-b border-slate-200 flex flex-col accordion-section">
+                <div class="flex items-center justify-between px-6 accordion-section-header flex-shrink-0 h-[60px]" 
+                     onclick="toggleSection('finished')"
+                     ondragover="handleSectionDragOver(event, 'finished')"
+                     ondragleave="handleSectionDragLeave(event)"
+                     ondrop="handleSectionDrop(event, 'finished')">
+                    <h3 class="text-xl font-medium text-black">已完成 (<span id="finishedCount">0</span>)</h3>
+                    <svg id="finishedChevron" class="w-6 h-6 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </div>
+                <div id="finishedContent" class="px-6 pb-6 space-y-6 hidden overflow-y-auto flex-1">
+                    <!-- Quadrant sections always visible -->
+                    <div id="finished-quadrant-重要不紧急" class="space-y-4">
+                        <div class="text-xs text-gray-500 font-medium">重要不紧急</div>
+                        <div class="space-y-2 finished-task-list min-h-[20px]"></div>
+                    </div>
+                    <div id="finished-quadrant-重要紧急" class="space-y-4">
+                        <div class="text-xs text-gray-500 font-medium">重要紧急</div>
+                        <div class="space-y-2 finished-task-list min-h-[20px]"></div>
+                    </div>
+                    <div id="finished-quadrant-不重要但紧急" class="space-y-4">
+                        <div class="text-xs text-gray-500 font-medium">不重要但紧急</div>
+                        <div class="space-y-2 finished-task-list min-h-[20px]"></div>
+                    </div>
+                    <div id="finished-quadrant-不重要不紧急" class="space-y-4">
+                        <div class="text-xs text-gray-500 font-medium">不重要不紧急</div>
+                        <div class="space-y-2 finished-task-list min-h-[20px]"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Calendar View -->
+        <div class="flex-1 flex flex-col calendar-container overflow-y-auto">
+            <div class="px-8 py-8">
+                <!-- Calendar Header (Sticky) -->
+                <div class="bg-neutral-100 px-12 py-2.5 rounded-t-lg sticky top-0 z-30">
+                    <div class="text-base font-medium text-black" id="weekRange">本周安排: </div>
+                </div>
+                
+                <!-- Calendar Grid -->
+                <div class="border-l border-t border-slate-200">
+                    <!-- Week Days Header (Sticky) -->
+                    <div class="flex sticky top-[44px] z-20 bg-white">
+                        <div class="w-10 flex-shrink-0"></div>
+                        <div class="flex flex-1">
+                            <div class="flex-1 bg-neutral-50 border-r border-b border-slate-200 px-2 py-1" id="day-0">
+                                <div class="text-xs font-bold text-zinc-500">21</div>
+                                <div class="text-base font-medium text-black">SUN</div>
+                            </div>
+                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1" id="day-1">
+                                <div class="text-xs font-bold text-zinc-500">22</div>
+                                <div class="text-base font-medium text-black">MON</div>
+                            </div>
+                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1" id="day-2">
+                                <div class="text-xs font-bold text-zinc-500">23</div>
+                                <div class="text-base font-medium text-black">TUE</div>
+                            </div>
+                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1" id="day-3">
+                                <div class="text-xs font-bold text-zinc-500">24</div>
+                                <div class="text-base font-medium text-black">WED</div>
+                            </div>
+                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1" id="day-4">
+                                <div class="text-xs font-bold text-zinc-500">25</div>
+                                <div class="text-base font-medium text-black">THU</div>
+                            </div>
+                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1" id="day-5">
+                                <div class="text-xs font-bold text-zinc-500">26</div>
+                                <div class="text-base font-medium text-black">FRI</div>
+                            </div>
+                            <div class="flex-1 bg-neutral-50 border-r border-b border-slate-200 px-2 py-1" id="day-6">
+                                <div class="text-xs font-bold text-zinc-500">27</div>
+                                <div class="text-base font-medium text-black">SAT</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Time Rows -->
+                    <div id="calendarGrid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // Global State
+        let tasks = [];
+        let calendarTasks = [];
+        let editingTaskId = null;
+        let draggedTask = null;
+        let draggedCalendarTask = null;
+        let lastMovedTask = null;
+        let lastDeletedData = null;
+        let undoTimeout = null;
+        
+        const colorMap = {
+            'violet': 'bg-violet-500',
+            'yellow': 'bg-yellow-500',
+            'cyan': 'bg-sky-500',
+            'emerald': 'bg-emerald-500',
+            'amber': 'bg-amber-500',
+            'rose': 'bg-rose-500'
+        };
+        
+        const hours = [
+            '7 AM', '8 AM', '9 AM', '10 AM', '11 AM', '12 PM',
+            '1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM',
+            '7 PM', '8 PM', '9 PM', 'Night'
+        ];
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeWeekDates();
+            generateCalendarGrid();
+            loadTasksFromStorage();
+            renderTasks();
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeDrawer();
+                }
+            });
+            
+            // Close drawer when clicking outside
+            document.getElementById('drawer').addEventListener('click', (e) => {
+                if (e.target.id === 'drawer') {
+                    closeDrawer();
+                }
+            });
+        });
+        
+        // Date Utilities
+        function initializeWeekDates() {
+            const today = new Date();
+            const dayOfWeek = today.getDay();
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(today.getDate() - dayOfWeek);
+            
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+            
+            document.getElementById('weekRange').textContent = 
+                `本周安排: ${startOfWeek.getMonth() + 1}/${startOfWeek.getDate()} - ${endOfWeek.getMonth() + 1}/${endOfWeek.getDate()}`;
+            
+            const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(startOfWeek);
+                date.setDate(startOfWeek.getDate() + i);
+                const dayElement = document.getElementById(`day-${i}`);
+                if (dayElement) {
+                    dayElement.innerHTML = `
+                        <div class="text-xs font-bold text-zinc-500">${date.getDate()}</div>
+                        <div class="text-base font-medium text-black">${days[i]}</div>
+                    `;
+                }
+            }
+        }
+        
+        // Calendar Grid Generation
+        function generateCalendarGrid() {
+            const grid = document.getElementById('calendarGrid');
+            let html = '';
+            
+            hours.forEach((hour, hourIndex) => {
+                html += `
+                    <div class="flex">
+                        <div class="w-10 flex-shrink-0 text-xs font-medium text-zinc-500 leading-4 pt-0">${hour}</div>
+                        <div class="flex flex-1">
+                `;
+                
+                for (let day = 0; day < 7; day++) {
+                    // Determine background color based on day and hour
+                    // Special color for 12 PM row (hourIndex 5)
+                    let dayBgClass;
+                    if (hourIndex === 5) {
+                        // 12 PM row - special yellow color
+                        dayBgClass = '';
+                    } else if (day === 0 || day === 6) {
+                        // Weekends - neutral-50
+                        dayBgClass = 'bg-neutral-50';
+                    } else {
+                        // Weekdays - white
+                        dayBgClass = 'bg-white';
+                    }
+                    
+                    // 12 PM row with 20% opacity
+                    const styleAttr = hourIndex === 5 ? ' style="background-color: rgba(231, 210, 123, 0.2);"' : '';
+                    
+                    html += `
+                        <div class="flex-1 border-r border-slate-200">
+                            <div class="${dayBgClass} calendar-block border-b border-slate-200 h-20 relative"${styleAttr}
+                                 data-day="${day}" 
+                                 data-hour="${hourIndex}"
+                                 ondragover="handleCalendarDragOver(event)"
+                                 ondragleave="handleCalendarDragLeave(event)"
+                                 ondrop="handleCalendarDrop(event)">
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+            
+            grid.innerHTML = html;
+        }
+        
+        // Drawer Functions
+        function openDrawer(mode, taskId = null) {
+            const drawer = document.getElementById('drawer');
+            const backdrop = document.getElementById('drawerBackdrop');
+            const title = document.getElementById('drawerTitle');
+            const form = document.getElementById('taskForm');
+            
+            drawer.classList.remove('drawer-closed');
+            drawer.classList.add('drawer-open');
+            backdrop.classList.remove('hidden');
+            
+            if (mode === 'edit' && taskId) {
+                title.textContent = '编辑任务';
+                const task = tasks.find(t => t.id === taskId);
+                if (task) {
+                    document.getElementById('taskId').value = task.id;
+                    document.getElementById('taskName').value = task.name;
+                    document.getElementById('taskQuadrant').value = task.quadrant;
+                    document.getElementById('taskColor').value = task.color;
+                    selectColor(task.color);
+                }
+            } else {
+                title.textContent = '添加任务';
+                form.reset();
+                document.getElementById('taskId').value = '';
+                document.getElementById('taskColor').value = 'violet';
+                selectColor('violet');
+            }
+            
+            // Focus on name input
+            setTimeout(() => {
+                document.getElementById('taskName').focus();
+            }, 100);
+        }
+        
+        function closeDrawer() {
+            const drawer = document.getElementById('drawer');
+            const backdrop = document.getElementById('drawerBackdrop');
+            drawer.classList.remove('drawer-open');
+            drawer.classList.add('drawer-closed');
+            backdrop.classList.add('hidden');
+        }
+        
+        function selectColor(color) {
+            document.querySelectorAll('.color-option').forEach(el => {
+                el.classList.remove('selected');
+            });
+            document.querySelector(`.color-option[data-color="${color}"]`).classList.add('selected');
+            document.getElementById('taskColor').value = color;
+        }
+        
+        // Task Form Submission
+        document.getElementById('taskForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const taskId = document.getElementById('taskId').value;
+            const name = document.getElementById('taskName').value.trim();
+            const quadrant = document.getElementById('taskQuadrant').value;
+            const color = document.getElementById('taskColor').value;
+            
+            if (!name) {
+                showToast('请输入任务名称');
+                return;
+            }
+            
+            if (taskId) {
+                // Edit existing task
+                const task = tasks.find(t => t.id === taskId);
+                if (task) {
+                    const oldQuadrant = task.quadrant;
+                    task.name = name;
+                    task.quadrant = quadrant;
+                    task.color = color;
+                    
+                    // Update all calendar instances
+                    calendarTasks.forEach(ct => {
+                        if (ct.taskId === taskId) {
+                            ct.name = name;
+                            ct.color = color;
+                        }
+                    });
+                }
+            } else {
+                // Create new task
+                const newTask = {
+                    id: Date.now().toString(),
+                    name,
+                    quadrant,
+                    color,
+                    section: 'planning'
+                };
+                tasks.push(newTask);
+            }
+            
+            saveTasksToStorage();
+            renderTasks();
+            closeDrawer();
+            showToast(taskId ? '任务已更新' : '任务已创建');
+        });
+        
+        // Section Toggle - Only one section open at a time
+        function toggleSection(section) {
+            const content = document.getElementById(`${section}Content`);
+            const chevron = document.getElementById(`${section}Chevron`);
+            const sectionContainer = document.getElementById(`${section}Section`);
+            const isCurrentlyOpen = !content.classList.contains('hidden');
+            
+            // Close all sections and remove flex-1
+            ['planning', 'thisweek', 'finished'].forEach(s => {
+                const sContent = document.getElementById(`${s}Content`);
+                const sChevron = document.getElementById(`${s}Chevron`);
+                const sContainer = document.getElementById(`${s}Section`);
+                sContent.classList.add('hidden');
+                sChevron.classList.remove('rotate-180');
+                sContainer.classList.remove('flex-1', 'min-h-0');
+            });
+            
+            // If the clicked section was closed, open it and add flex-1
+            if (!isCurrentlyOpen) {
+                content.classList.remove('hidden');
+                chevron.classList.add('rotate-180');
+                sectionContainer.classList.add('flex-1', 'min-h-0');
+            }
+        }
+        
+        // Render Tasks
+        function renderTasks() {
+            // Clear all sections
+            document.querySelectorAll('.task-list').forEach(el => el.innerHTML = '');
+            document.querySelectorAll('.thisweek-task-list').forEach(el => el.innerHTML = '');
+            document.querySelectorAll('.finished-task-list').forEach(el => el.innerHTML = '');
+            
+            const planningSectionTasks = tasks.filter(t => t.section === 'planning');
+            const thisweekTasks = tasks.filter(t => t.section === 'thisweek');
+            const finishedTasks = tasks.filter(t => t.section === 'finished');
+            
+            // Render planning section
+            if (planningSectionTasks.length === 0) {
+                document.getElementById('emptyState').classList.remove('hidden');
+                document.getElementById('taskSections').classList.add('hidden');
+            } else {
+                document.getElementById('emptyState').classList.add('hidden');
+                document.getElementById('taskSections').classList.remove('hidden');
+                
+                // Group tasks by quadrant
+                planningSectionTasks.forEach(task => {
+                    const quadrantContainer = document.querySelector(`#quadrant-${task.quadrant} .task-list`);
+                    if (quadrantContainer) {
+                        quadrantContainer.appendChild(createTaskElement(task));
+                    }
+                });
+            }
+            
+            // Render thisweek section - always show all quadrants
+            thisweekTasks.forEach(task => {
+                const quadrantContainer = document.querySelector(`#thisweek-quadrant-${task.quadrant} .thisweek-task-list`);
+                if (quadrantContainer) {
+                    quadrantContainer.appendChild(createSimpleTaskElement(task));
+                }
+            });
+            
+            // Render finished section - always show all quadrants
+            finishedTasks.forEach(task => {
+                const quadrantContainer = document.querySelector(`#finished-quadrant-${task.quadrant} .finished-task-list`);
+                if (quadrantContainer) {
+                    quadrantContainer.appendChild(createSimpleTaskElement(task));
+                }
+            });
+            
+            // Update counts
+            document.getElementById('planningCount').textContent = planningSectionTasks.length;
+            document.getElementById('thisweekCount').textContent = thisweekTasks.length;
+            document.getElementById('finishedCount').textContent = finishedTasks.length;
+            
+            // Render calendar tasks
+            renderCalendarTasks();
+        }
+        
+        function renderQuadrantSection(sectionName, sectionTasks) {
+            const container = document.getElementById(`${sectionName}-quadrants`);
+            container.innerHTML = '';
+            
+            if (sectionTasks.length === 0) {
+                return;
+            }
+            
+            const quadrants = ['重要不紧急', '重要紧急', '不重要但紧急', '不重要不紧急'];
+            
+            quadrants.forEach(quadrant => {
+                const quadrantTasks = sectionTasks.filter(t => t.quadrant === quadrant);
+                if (quadrantTasks.length > 0) {
+                    const quadrantDiv = document.createElement('div');
+                    quadrantDiv.className = 'space-y-4';
+                    quadrantDiv.innerHTML = `<div class="text-xs text-gray-500 font-medium">${quadrant}</div>`;
+                    
+                    const taskList = document.createElement('div');
+                    taskList.className = 'space-y-2';
+                    
+                    quadrantTasks.forEach(task => {
+                        taskList.appendChild(createSimpleTaskElement(task));
+                    });
+                    
+                    quadrantDiv.appendChild(taskList);
+                    container.appendChild(quadrantDiv);
+                }
+            });
+        }
+        
+        function createSimpleTaskElement(task) {
+            const div = document.createElement('div');
+            div.className = 'task-card bg-white border-l-0 border-r border-t border-b border-slate-200 rounded h-10 flex items-center gap-1 pr-2';
+            div.draggable = true;
+            div.dataset.taskId = task.id;
+            
+            div.innerHTML = `
+                <div class="${colorMap[task.color]} h-full w-1 flex-shrink-0 rounded-l"></div>
+                <div class="flex items-center justify-center w-4 h-4 flex-shrink-0 ml-1">
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
+                        <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                        <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
+                    </svg>
+                </div>
+                <div class="flex-1 text-sm text-gray-800 truncate">${escapeHtml(task.name)}</div>
+                <button class="edit-button w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded flex-shrink-0" onclick="event.stopPropagation(); openDrawer('edit', '${task.id}')" title="编辑任务">
+                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                </button>
+                <button class="edit-button w-6 h-6 flex items-center justify-center hover:bg-red-100 rounded flex-shrink-0 text-red-600" onclick="event.stopPropagation(); deleteTask('${task.id}')" title="删除任务">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+            `;
+            
+            // Drag events for accordion tasks
+            div.addEventListener('dragstart', (e) => {
+                draggedTask = task;
+                div.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', task.id);
+            });
+            
+            div.addEventListener('dragend', (e) => {
+                div.classList.remove('dragging');
+                draggedTask = null;
+                document.querySelectorAll('.accordion-section-header').forEach(header => {
+                    header.classList.remove('drag-over-section');
+                });
+            });
+            
+            // Prevent drag when clicking buttons
+            const buttons = div.querySelectorAll('button');
+            buttons.forEach(btn => {
+                btn.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                });
+            });
+            
+            return div;
+        }
+        
+        function createTaskElement(task) {
+            const div = document.createElement('div');
+            div.className = 'task-card bg-white border-l-0 border-r border-t border-b border-slate-200 rounded h-10 flex items-center gap-1 pr-2';
+            div.draggable = true;
+            div.dataset.taskId = task.id;
+            
+            div.innerHTML = `
+                <div class="${colorMap[task.color]} h-full w-1 flex-shrink-0 rounded-l"></div>
+                <div class="flex items-center justify-center w-4 h-4 flex-shrink-0 ml-1">
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
+                        <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                        <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
+                    </svg>
+                </div>
+                <div class="flex-1 text-sm text-gray-800 truncate">${escapeHtml(task.name)}</div>
+                <button class="edit-button w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded flex-shrink-0" onclick="event.stopPropagation(); openDrawer('edit', '${task.id}')" title="编辑任务">
+                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                </button>
+                <button class="edit-button w-6 h-6 flex items-center justify-center hover:bg-red-100 rounded flex-shrink-0 text-red-600" onclick="event.stopPropagation(); deleteTask('${task.id}')" title="删除任务">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+            `;
+            
+            // Drag events for accordion tasks
+            div.addEventListener('dragstart', (e) => {
+                draggedTask = task;
+                div.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', task.id);
+            });
+            
+            div.addEventListener('dragend', (e) => {
+                div.classList.remove('dragging');
+                draggedTask = null;
+                // Remove hover states from all sections
+                document.querySelectorAll('.accordion-section-header').forEach(header => {
+                    header.classList.remove('drag-over-section');
+                });
+            });
+            
+            // Prevent drag when clicking buttons
+            const buttons = div.querySelectorAll('button');
+            buttons.forEach(btn => {
+                btn.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                });
+            });
+            
+            return div;
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function deleteTask(taskId) {
+            // Find the task and its calendar instances
+            const task = tasks.find(t => t.id === taskId);
+            const relatedCalendarTasks = calendarTasks.filter(ct => ct.taskId === taskId);
+            
+            if (task) {
+                // Save for undo
+                lastDeletedData = {
+                    task: {...task},
+                    calendarTasks: relatedCalendarTasks.map(ct => ({...ct}))
+                };
+                
+                // Remove task and calendar instances
+                tasks = tasks.filter(t => t.id !== taskId);
+                calendarTasks = calendarTasks.filter(ct => ct.taskId !== taskId);
+                
+                saveTasksToStorage();
+                renderTasks();
+                renderCalendarTasks();
+                showToastWithUndoDelete('任务已删除');
+            }
+        }
+        
+        // Section Drag & Drop Handlers
+        function handleSectionDragOver(e, section) {
+            if (draggedTask && !draggedCalendarTask) {
+                e.preventDefault();
+                e.currentTarget.classList.add('drag-over-section');
+            }
+        }
+        
+        function handleSectionDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over-section');
+        }
+        
+        function handleSectionDrop(e, targetSection) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over-section');
+            
+            if (draggedTask) {
+                // Move task to new section
+                const task = tasks.find(t => t.id === draggedTask.id);
+                if (task && task.section !== targetSection) {
+                    const oldSection = task.section;
+                    
+                    // Save calendar tasks for undo if moving to finished
+                    const relatedCalendarTasks = calendarTasks.filter(ct => ct.taskId === task.id);
+                    
+                    task.section = targetSection;
+                    
+                    // If moving to finished, remove from calendar
+                    if (targetSection === 'finished') {
+                        calendarTasks = calendarTasks.filter(ct => ct.taskId !== task.id);
+                    }
+                    
+                    // Save for undo
+                    lastMovedTask = {
+                        taskId: task.id,
+                        oldSection: oldSection,
+                        newSection: targetSection,
+                        calendarTasks: relatedCalendarTasks.map(ct => ({...ct}))
+                    };
+                    
+                    saveTasksToStorage();
+                    renderTasks();
+                    renderCalendarTasks();
+                    
+                    // Show toast with undo button if moved to finished
+                    if (targetSection === 'finished') {
+                        showToastWithUndo(`任务已移至${getSectionName(targetSection)}`);
+                    } else {
+                        showToast(`任务已移至${getSectionName(targetSection)}`);
+                    }
+                }
+            }
+        }
+        
+        function getSectionName(section) {
+            const names = {
+                'planning': '计划中',
+                'thisweek': '本周要务',
+                'finished': '已完成'
+            };
+            return names[section] || section;
+        }
+        
+        // Calendar Drag & Drop
+        function handleCalendarDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('drag-over');
+        }
+        
+        function handleCalendarDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+        
+        function handleCalendarDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            
+            const day = parseInt(e.currentTarget.dataset.day);
+            const hour = parseInt(e.currentTarget.dataset.hour);
+            
+            if (draggedTask) {
+                // Check how many tasks are already in this cell
+                const tasksInCell = calendarTasks.filter(ct => 
+                    ct.day === day && ct.hour === hour
+                );
+                
+                if (tasksInCell.length >= 2) {
+                    showToast('每个时间块最多只能放置2个任务');
+                    return;
+                }
+                
+                // Create a copy of the task in the calendar
+                const calendarTask = {
+                    id: Date.now().toString(),
+                    taskId: draggedTask.id,
+                    name: draggedTask.name,
+                    color: draggedTask.color,
+                    day,
+                    hour,
+                    position: tasksInCell.length // 0 for first, 1 for second
+                };
+                
+                calendarTasks.push(calendarTask);
+                saveTasksToStorage();
+                renderCalendarTasks();
+            } else if (draggedCalendarTask) {
+                // Check if moving to a new cell
+                if (draggedCalendarTask.day !== day || 
+                    draggedCalendarTask.hour !== hour) {
+                    
+                    // Check how many tasks are in target cell
+                    const tasksInTargetCell = calendarTasks.filter(ct => 
+                        ct.id !== draggedCalendarTask.id &&
+                        ct.day === day && ct.hour === hour
+                    );
+                    
+                    if (tasksInTargetCell.length >= 2) {
+                        showToast('每个时间块最多只能放置2个任务');
+                        renderCalendarTasks(); // Reset position
+                        return;
+                    }
+                    
+                    draggedCalendarTask.day = day;
+                    draggedCalendarTask.hour = hour;
+                    draggedCalendarTask.position = tasksInTargetCell.length;
+                }
+                
+                saveTasksToStorage();
+                renderCalendarTasks();
+            }
+        }
+        
+        function renderCalendarTasks() {
+            // Clear all calendar tasks
+            document.querySelectorAll('.calendar-task').forEach(el => el.remove());
+            
+            // Group tasks by cell (80px blocks)
+            const cellMap = new Map();
+            calendarTasks.forEach(ct => {
+                const key = `${ct.day}-${ct.hour}`;
+                if (!cellMap.has(key)) {
+                    cellMap.set(key, []);
+                }
+                cellMap.get(key).push(ct);
+            });
+            
+            // Render tasks
+            cellMap.forEach((tasks, key) => {
+                const [day, hour] = key.split('-').map(Number);
+                const block = document.querySelector(
+                    `.calendar-block[data-day="${day}"][data-hour="${hour}"]`
+                );
+                
+                if (block && tasks.length > 0) {
+                    // Sort by position
+                    tasks.sort((a, b) => (a.position || 0) - (b.position || 0));
+                    
+                    const taskCount = tasks.length;
+                    const taskHeight = taskCount === 1 ? '76px' : '36px'; // 80px cell - 4px padding
+                    
+                    tasks.forEach((ct, index) => {
+                        const taskEl = document.createElement('div');
+                        taskEl.className = 'calendar-task bg-white border border-slate-200 rounded flex items-center gap-1 px-2 cursor-move shadow-sm hover:shadow-md transition-shadow';
+                        taskEl.draggable = true;
+                        taskEl.style.height = taskHeight;
+                        taskEl.style.top = taskCount === 1 ? '2px' : `${2 + index * 40}px`;
+                        taskEl.title = `${ct.name}`;
+                        
+                        taskEl.innerHTML = `
+                            <div class="${colorMap[ct.color]} h-full w-1 flex-shrink-0 rounded-l"></div>
+                            <div class="flex items-center justify-center w-3 h-3 flex-shrink-0">
+                                <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="6" r="1" fill="currentColor"/>
+                                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                                    <circle cx="12" cy="18" r="1" fill="currentColor"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1 text-xs text-gray-800 truncate">${escapeHtml(ct.name)}</div>
+                            <button class="close-button w-5 h-5 flex items-center justify-center hover:bg-red-50 rounded flex-shrink-0 text-gray-500 hover:text-red-600 transition-colors" title="移除" type="button">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        `;
+                        
+                        // Drag events for calendar tasks
+                        taskEl.addEventListener('dragstart', (e) => {
+                            draggedCalendarTask = ct;
+                            taskEl.style.opacity = '0.5';
+                            e.dataTransfer.effectAllowed = 'move';
+                        });
+                        
+                        taskEl.addEventListener('dragend', (e) => {
+                            taskEl.style.opacity = '1';
+                            draggedCalendarTask = null;
+                        });
+                        
+                        // Close button click handler
+                        const closeBtn = taskEl.querySelector('.close-button');
+                        closeBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            calendarTasks = calendarTasks.filter(t => t.id !== ct.id);
+                            // Reorder remaining tasks in this cell
+                            const remaining = calendarTasks.filter(t => 
+                                t.day === ct.day && t.hour === ct.hour
+                            );
+                            remaining.forEach((t, i) => t.position = i);
+                            saveTasksToStorage();
+                            renderCalendarTasks();
+                            showToast('已从日历移除');
+                        });
+                        
+                        // Prevent drag when clicking close button
+                        closeBtn.addEventListener('mousedown', (e) => {
+                            e.stopPropagation();
+                        });
+                        
+                        block.appendChild(taskEl);
+                    });
+                }
+            });
+        }
+        
+        // Storage
+        function saveTasksToStorage() {
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+            localStorage.setItem('calendarTasks', JSON.stringify(calendarTasks));
+        }
+        
+        function loadTasksFromStorage() {
+            const storedTasks = localStorage.getItem('tasks');
+            const storedCalendarTasks = localStorage.getItem('calendarTasks');
+            
+            if (storedTasks) {
+                tasks = JSON.parse(storedTasks);
+            }
+            
+            if (storedCalendarTasks) {
+                calendarTasks = JSON.parse(storedCalendarTasks);
+            }
+        }
+        
+        // Toast Notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.innerHTML = message;
+            toast.classList.add('show');
+            
+            if (undoTimeout) clearTimeout(undoTimeout);
+            undoTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        function showToastWithUndo(message) {
+            const toast = document.getElementById('toast');
+            toast.innerHTML = `
+                <span>${message}</span>
+                <button onclick="undoTaskMove()" class="ml-4 px-3 py-1 bg-white text-gray-900 rounded hover:bg-gray-100 transition-colors text-sm font-medium">
+                    撤销
+                </button>
+            `;
+            toast.classList.add('show');
+            
+            if (undoTimeout) clearTimeout(undoTimeout);
+            undoTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+                lastMovedTask = null;
+            }, 5000);
+        }
+        
+        function undoTaskMove() {
+            if (lastMovedTask) {
+                const task = tasks.find(t => t.id === lastMovedTask.taskId);
+                if (task) {
+                    task.section = lastMovedTask.oldSection;
+                    
+                    // Restore calendar tasks if they were removed
+                    if (lastMovedTask.calendarTasks && lastMovedTask.calendarTasks.length > 0) {
+                        lastMovedTask.calendarTasks.forEach(ct => {
+                            calendarTasks.push(ct);
+                        });
+                    }
+                    
+                    saveTasksToStorage();
+                    renderTasks();
+                    renderCalendarTasks();
+                    showToast('已撤销');
+                    lastMovedTask = null;
+                }
+            }
+            document.getElementById('toast').classList.remove('show');
+        }
+        
+        function showToastWithUndoDelete(message) {
+            const toast = document.getElementById('toast');
+            toast.innerHTML = `
+                <span>${message}</span>
+                <button onclick="undoTaskDelete()" class="ml-4 px-3 py-1 bg-white text-gray-900 rounded hover:bg-gray-100 transition-colors text-sm font-medium">
+                    撤销
+                </button>
+            `;
+            toast.classList.add('show');
+            
+            if (undoTimeout) clearTimeout(undoTimeout);
+            undoTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+                lastDeletedData = null;
+            }, 5000);
+        }
+        
+        function undoTaskDelete() {
+            if (lastDeletedData) {
+                // Restore task
+                tasks.push(lastDeletedData.task);
+                
+                // Restore calendar tasks
+                if (lastDeletedData.calendarTasks && lastDeletedData.calendarTasks.length > 0) {
+                    lastDeletedData.calendarTasks.forEach(ct => {
+                        calendarTasks.push(ct);
+                    });
+                }
+                
+                saveTasksToStorage();
+                renderTasks();
+                renderCalendarTasks();
+                showToast('已撤销');
+                lastDeletedData = null;
+            }
+            document.getElementById('toast').classList.remove('show');
+        }
+    </script>
+</body>
+</html>
+
