@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>任务管理 - Week Plan</title>
-    <!-- 使用国内CDN加速 -->
-    <script src="https://unpkg.com/tailwindcss-cdn@3.4.1/tailwindcss.js"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <!-- Tailwind CSS 直接引入 -->
+    <link href="https://unpkg.com/tailwindcss@3/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Supabase JS -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         
@@ -716,10 +717,13 @@
             }
             
             try {
+                // 明确指定重定向URL
+                const redirectUrl = 'https://sunqingyi11.github.io/Week-Planner'
+                
                 const { data, error } = await supabase.auth.signInWithOAuth({
                     provider: 'google',
                     options: {
-                        redirectTo: window.location.origin
+                        redirectTo: redirectUrl
                     }
                 })
                 
