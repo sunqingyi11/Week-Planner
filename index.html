@@ -862,11 +862,17 @@
         // Save data to Supabase
         async function saveDataToSupabase() {
             if (!supabase || !currentUser) {
+                console.log('⚠️ 未登录，保存到localStorage')
                 saveTasksToStorage() // Fallback to localStorage
                 return
             }
             
             try {
+                console.log('💾 保存到Supabase:', {
+                    tasks: tasks.length,
+                    calendarTasks: calendarTasks.length
+                })
+                
                 const { data, error } = await supabase
                     .from('user_tasks')
                     .upsert({
@@ -880,10 +886,12 @@
                 
                 if (error) throw error
                 
+                console.log('✅ 保存成功')
+                
                 // Also save to localStorage as backup
                 saveTasksToStorage()
             } catch (error) {
-                console.error('Save data error:', error)
+                console.error('❌ 保存失败:', error)
                 // Fallback to localStorage
                 saveTasksToStorage()
             }
@@ -1378,7 +1386,7 @@
                 tasks = tasks.filter(t => t.id !== taskId);
                 calendarTasks = calendarTasks.filter(ct => ct.taskId !== taskId);
                 
-                saveTasksToStorage();
+                saveDataToSupabase();
                 renderTasks();
                 renderCalendarTasks();
                 showToastWithUndoDelete('任务已删除');
@@ -1425,7 +1433,7 @@
                         calendarTasks: relatedCalendarTasks.map(ct => ({...ct}))
                     };
                     
-                    saveTasksToStorage();
+                    saveDataToSupabase();
                     renderTasks();
                     renderCalendarTasks();
                     
@@ -1488,7 +1496,7 @@
                 };
                 
                 calendarTasks.push(calendarTask);
-                saveTasksToStorage();
+                saveDataToSupabase();
                 renderCalendarTasks();
             } else if (draggedCalendarTask) {
                 // Check if moving to a new cell
@@ -1512,7 +1520,7 @@
                     draggedCalendarTask.position = tasksInTargetCell.length;
                 }
                 
-                saveTasksToStorage();
+                saveDataToSupabase();
                 renderCalendarTasks();
             }
         }
@@ -1592,7 +1600,7 @@
                                 t.day === ct.day && t.hour === ct.hour
                             );
                             remaining.forEach((t, i) => t.position = i);
-                            saveTasksToStorage();
+                            saveDataToSupabase();
                             renderCalendarTasks();
                             showToast('已从日历移除');
                         });
@@ -1669,7 +1677,7 @@
                         });
                     }
                     
-                    saveTasksToStorage();
+                    saveDataToSupabase();
                     renderTasks();
                     renderCalendarTasks();
                     showToast('已撤销');
@@ -1708,7 +1716,7 @@
                     });
                 }
                 
-                saveTasksToStorage();
+                saveDataToSupabase();
                 renderTasks();
                 renderCalendarTasks();
                 showToast('已撤销');
