@@ -71,10 +71,18 @@
         
         .sidebar {
             transition: transform 0.3s ease;
+            position: relative;
         }
         
         .sidebar-collapsed {
             transform: translateX(-100%);
+            position: absolute;
+        }
+        
+        /* Calendar view expansion when sidebar is collapsed */
+        .calendar-expanded {
+            margin-left: 0 !important;
+            width: 100% !important;
         }
         
         /* Calendar block hover effect for adding tasks */
@@ -158,14 +166,16 @@
             z-index: 10;
         }
         
-        .calendar-task .close-button {
+        .calendar-task .close-button,
+        .calendar-task .check-button {
             opacity: 0;
             transition: opacity 0.2s ease, background-color 0.2s ease;
             z-index: 20;
             pointer-events: all;
         }
         
-        .calendar-task:hover .close-button {
+        .calendar-task:hover .close-button,
+        .calendar-task:hover .check-button {
             opacity: 1;
         }
         
@@ -296,7 +306,7 @@
                 </div>
                 
                 <!-- Form -->
-                <form id="taskForm" class="flex flex-col gap-4 flex-1">
+                <form id="taskForm" class="flex flex-col gap-4">
                     <input type="hidden" id="taskId" value="">
                     
                     <!-- Name Field -->
@@ -342,7 +352,7 @@
                     </div>
                     
                     <!-- Save Button -->
-                    <div class="mt-auto">
+                    <div class="mt-8">
                         <button 
                             type="submit" 
                             class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors"
@@ -357,48 +367,46 @@
         <!-- Accordion Sidebar -->
         <div id="accordionSidebar" class="sidebar w-80 bg-white border-r border-slate-200 flex flex-col h-screen">
             <!-- User Section -->
-            <div id="userSection" class="border-b border-slate-200 flex-shrink-0">
+            <div id="userSection" class="flex-shrink-0">
                 <!-- Logged Out State -->
-                <div id="loggedOutState" class="px-6 py-6 space-y-3">
-                    <div class="text-sm text-gray-600 mb-4">
-                        <p class="font-medium text-black mb-1">欢迎使用任务管理器</p>
-                        <p class="text-xs">登录后可在多设备间同步您的任务</p>
+                <div id="loggedOutState" class="flex flex-col h-screen justify-center px-6 py-8">
+                    <div class="space-y-6">
+                        <div class="text-center mb-12">
+                            <h1 class="text-2xl font-semibold text-black mb-2">Week Planner</h1>
+                            <p class="text-sm text-gray-600">登录后可在多设备间同步您的任务</p>
+                        </div>
+                        <button onclick="showSignupModal()" class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-3 rounded-md hover:bg-slate-800 transition-colors">
+                            注册
+                        </button>
+                        <button onclick="showLoginModal()" class="w-full border border-slate-200 text-slate-900 text-sm font-medium px-4 py-3 rounded-md hover:bg-slate-50 transition-colors">
+                            登录
+                        </button>
                     </div>
-                    <button onclick="showLoginModal()" class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors">
-                        登录
-                    </button>
-                    <button onclick="showSignupModal()" class="w-full border border-slate-200 text-slate-900 text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-50 transition-colors">
-                        注册
-                    </button>
                 </div>
                 
                 <!-- Logged In State -->
-                <div id="loggedInState" class="px-6 py-6 hidden">
-                    <div class="flex items-center gap-3 mb-4">
-                        <div id="userAvatar" class="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm">
-                            U
+                <div id="loggedInState" class="border-b border-slate-200 px-6 py-3 hidden">
+                    <div class="flex items-center justify-between">
+                        <div class="flex flex-col gap-0.5">
+                            <h2 class="text-base font-semibold text-black">Week Planner</h2>
+                            <p id="userEmail" class="text-xs font-light text-gray-500">user@example.com</p>
                         </div>
-                        <div class="flex-1 min-w-0">
-                            <div id="userName" class="text-sm font-medium text-black truncate">用户名</div>
-                            <div id="userEmail" class="text-xs text-gray-500 truncate">user@example.com</div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="syncData()" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded transition-colors" title="同步数据">
+                                <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </button>
+                            <button onclick="signOut()" class="bg-white text-red-600 text-sm font-medium px-3 py-1.5 rounded-md hover:bg-red-50 transition-colors">
+                                登出
+                            </button>
                         </div>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="syncData()" class="flex-1 border border-slate-200 text-slate-700 text-xs font-medium px-3 py-2 rounded-md hover:bg-slate-50 transition-colors flex items-center justify-center gap-1" title="同步数据">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            同步
-                        </button>
-                        <button onclick="signOut()" class="flex-1 border border-red-200 text-red-600 text-xs font-medium px-3 py-2 rounded-md hover:bg-red-50 transition-colors">
-                            登出
-                        </button>
                     </div>
                 </div>
             </div>
             
             <!-- Planning Section -->
-            <div id="planningSection" class="border-b border-slate-200 flex flex-col accordion-section flex-1 min-h-0">
+            <div id="planningSection" class="border-b border-slate-200 flex flex-col accordion-section flex-1 min-h-0 hidden">
                 <div class="flex items-center justify-between px-6 accordion-section-header flex-shrink-0 h-[60px]" 
                      onclick="toggleSection('planning')"
                      ondragover="handleSectionDragOver(event, 'planning')"
@@ -448,7 +456,7 @@
             </div>
             
             <!-- This Week Section -->
-            <div id="thisweekSection" class="border-b border-slate-200 flex flex-col accordion-section">
+            <div id="thisweekSection" class="border-b border-slate-200 flex flex-col accordion-section hidden">
                 <div class="flex items-center justify-between px-6 accordion-section-header flex-shrink-0 h-[60px]" 
                      onclick="toggleSection('thisweek')"
                      ondragover="handleSectionDragOver(event, 'thisweek')"
@@ -481,7 +489,7 @@
             </div>
             
             <!-- Finished Section -->
-            <div id="finishedSection" class="border-b border-slate-200 flex flex-col accordion-section">
+            <div id="finishedSection" class="border-b border-slate-200 flex flex-col accordion-section hidden">
                 <div class="flex items-center justify-between px-6 accordion-section-header flex-shrink-0 h-[60px]" 
                      onclick="toggleSection('finished')"
                      ondragover="handleSectionDragOver(event, 'finished')"
@@ -793,19 +801,24 @@
             document.getElementById('loggedOutState').classList.add('hidden')
             document.getElementById('loggedInState').classList.remove('hidden')
             
-            // Set user info
-            document.getElementById('userName').textContent = user.user_metadata?.name || user.email?.split('@')[0] || '用户'
-            document.getElementById('userEmail').textContent = user.email
+            // Show task sections
+            document.getElementById('planningSection').classList.remove('hidden')
+            document.getElementById('thisweekSection').classList.remove('hidden')
+            document.getElementById('finishedSection').classList.remove('hidden')
             
-            // Set avatar initial
-            const initial = (user.user_metadata?.name || user.email || 'U')[0].toUpperCase()
-            document.getElementById('userAvatar').textContent = initial
+            // Set user email
+            document.getElementById('userEmail').textContent = user.email || 'user@example.com'
         }
         
         // Update UI for logged out state
         function updateUIForLoggedOut() {
             document.getElementById('loggedOutState').classList.remove('hidden')
             document.getElementById('loggedInState').classList.add('hidden')
+            
+            // Hide task sections
+            document.getElementById('planningSection').classList.add('hidden')
+            document.getElementById('thisweekSection').classList.add('hidden')
+            document.getElementById('finishedSection').classList.add('hidden')
         }
         
         // Modal controls
@@ -1089,16 +1102,19 @@
             const sidebar = document.getElementById('accordionSidebar');
             const toggle = document.getElementById('sidebarToggle');
             const icon = document.getElementById('toggleIcon');
+            const calendarView = document.querySelector('.calendar-container');
             
             sidebarOpen = !sidebarOpen;
             
             if (sidebarOpen) {
                 sidebar.classList.remove('sidebar-collapsed');
                 toggle.classList.add('sidebar-open');
+                if (calendarView) calendarView.classList.remove('calendar-expanded');
                 icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />';
             } else {
                 sidebar.classList.add('sidebar-collapsed');
                 toggle.classList.remove('sidebar-open');
+                if (calendarView) calendarView.classList.add('calendar-expanded');
                 icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />';
             }
         }
