@@ -748,6 +748,7 @@
         let undoTimeout = null;
         let sidebarOpen = true;
         let draggedFromQuadrant = null;
+        let pendingCalendarPosition = null; // Store calendar position when creating from calendar
         
         const colorMap = {
             'violet': 'bg-violet-500',
@@ -1269,12 +1270,19 @@
                 return;
             }
             
-            // Open drawer to create new task
-            openDrawer('create');
+            // Store the calendar position for after task creation
+            pendingCalendarPosition = {
+                day: day,
+                hour: hour,
+                position: tasksInCell.length
+            };
+            
+            // Open drawer to create new task with calendar defaults
+            openDrawer('create', null, true);
         }
         
         // Drawer Functions
-        function openDrawer(mode, taskId = null) {
+        function openDrawer(mode, taskId = null, fromCalendar = false) {
             const drawer = document.getElementById('drawer');
             const backdrop = document.getElementById('drawerBackdrop');
             const title = document.getElementById('drawerTitle');
@@ -1299,6 +1307,14 @@
                 form.reset();
                 document.getElementById('taskId').value = '';
                 document.getElementById('taskColor').value = 'violet';
+                
+                // Set default quadrant based on where it's created from
+                if (fromCalendar) {
+                    document.getElementById('taskQuadrant').value = '不重要但紧急';
+                } else {
+                    document.getElementById('taskQuadrant').value = '重要不紧急';
+                }
+                
                 selectColor('violet');
             }
             
@@ -1314,6 +1330,9 @@
             drawer.classList.remove('drawer-open');
             drawer.classList.add('drawer-closed');
             backdrop.classList.add('hidden');
+            
+            // Clear pending calendar position if drawer is closed without saving
+            pendingCalendarPosition = null;
         }
         
         function selectColor(color) {
@@ -1357,18 +1376,35 @@
                 }
             } else {
                 // Create new task
+                const newTaskId = Date.now().toString();
                 const newTask = {
-                    id: Date.now().toString(),
+                    id: newTaskId,
                     name,
                     quadrant,
                     color,
                     section: 'planning'
                 };
                 tasks.push(newTask);
+                
+                // If created from calendar, automatically add to calendar at that position
+                if (pendingCalendarPosition) {
+                    const calendarTask = {
+                        id: Date.now().toString() + '_cal',
+                        taskId: newTaskId,
+                        name: name,
+                        color: color,
+                        day: pendingCalendarPosition.day,
+                        hour: pendingCalendarPosition.hour,
+                        position: pendingCalendarPosition.position
+                    };
+                    calendarTasks.push(calendarTask);
+                    pendingCalendarPosition = null; // Reset
+                }
             }
             
             saveDataToSupabase();
             renderTasks();
+            renderCalendarTasks();
             closeDrawer();
             showToast(taskId ? '任务已更新' : '任务已创建');
         });
