@@ -42,6 +42,115 @@
             position: relative;
         }
         
+        /* Mobile sidebar toggle */
+        .sidebar-toggle {
+            position: fixed;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 60;
+            transition: left 0.3s ease;
+        }
+        
+        .sidebar-toggle.sidebar-open {
+            left: 320px;
+        }
+        
+        @media (min-width: 768px) {
+            .sidebar-toggle {
+                display: flex;
+            }
+        }
+        
+        @media (max-width: 767px) {
+            .sidebar {
+                position: fixed;
+                z-index: 55;
+            }
+        }
+        
+        .sidebar {
+            transition: transform 0.3s ease;
+        }
+        
+        .sidebar-collapsed {
+            transform: translateX(-100%);
+        }
+        
+        /* Calendar block hover effect for adding tasks */
+        .calendar-block:hover .add-task-icon {
+            opacity: 1;
+        }
+        
+        .add-task-icon {
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        
+        .calendar-block:hover {
+            cursor: pointer;
+        }
+        
+        /* Current time indicator */
+        .current-time-line {
+            position: absolute;
+            left: 40px;
+            right: 0;
+            height: 2px;
+            background-color: #ef4444;
+            z-index: 20;
+            pointer-events: none;
+        }
+        
+        .current-time-line::before {
+            content: '';
+            position: absolute;
+            left: -6px;
+            top: -4px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #ef4444;
+        }
+        
+        /* Task in calendar - completed state */
+        .calendar-task.completed {
+            opacity: 0.6;
+        }
+        
+        .calendar-task.completed .task-name {
+            text-decoration: line-through;
+            color: #9ca3af;
+        }
+        
+        /* Task added to calendar indicator */
+        .task-added-to-calendar {
+            opacity: 0.5;
+        }
+        
+        .task-added-to-calendar .task-bar {
+            opacity: 0.3;
+        }
+        
+        .task-added-to-calendar .task-name {
+            color: #9ca3af;
+        }
+        
+        /* Quadrant drop zone */
+        .quadrant-drop-zone {
+            transition: background-color 0.2s ease;
+        }
+        
+        .quadrant-drop-zone.drag-over-quadrant {
+            background-color: rgba(59, 130, 246, 0.05);
+            border-left: 3px solid #3b82f6;
+        }
+        
         .calendar-task {
             position: absolute;
             width: calc(100% - 4px);
@@ -164,6 +273,13 @@
     <!-- Backdrop Overlay -->
     <div id="drawerBackdrop" class="fixed inset-0 bg-black bg-opacity-30 z-40 hidden transition-opacity" onclick="closeDrawer()"></div>
     
+    <!-- Sidebar Toggle Button -->
+    <button id="sidebarToggle" class="sidebar-toggle sidebar-open bg-white rounded-r-full w-8 h-12 shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors" onclick="toggleSidebar()">
+        <svg id="toggleIcon" class="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+    </button>
+    
     <!-- Main Container -->
     <div class="flex h-screen">
         <!-- Drawer (Initially Hidden) -->
@@ -239,7 +355,7 @@
         </div>
         
         <!-- Accordion Sidebar -->
-        <div class="w-80 bg-white border-r border-slate-200 flex flex-col h-screen">
+        <div id="accordionSidebar" class="sidebar w-80 bg-white border-r border-slate-200 flex flex-col h-screen">
             <!-- User Section -->
             <div id="userSection" class="border-b border-slate-200 flex-shrink-0">
                 <!-- Logged Out State -->
@@ -412,31 +528,31 @@
                     <div class="flex sticky top-[44px] z-20 bg-white">
                         <div class="w-10 flex-shrink-0"></div>
                         <div class="flex flex-1">
-                            <div class="flex-1 bg-neutral-50 border-r border-b border-slate-200 px-2 py-1" id="day-0">
+                            <div class="flex-1 bg-neutral-50 border-r border-b border-slate-200 px-2 py-1 day-header" id="day-0">
                                 <div class="text-xs font-bold text-zinc-500">21</div>
                                 <div class="text-base font-medium text-black">SUN</div>
                             </div>
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1" id="day-1">
+                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-1">
                                 <div class="text-xs font-bold text-zinc-500">22</div>
                                 <div class="text-base font-medium text-black">MON</div>
                             </div>
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1" id="day-2">
+                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-2">
                                 <div class="text-xs font-bold text-zinc-500">23</div>
                                 <div class="text-base font-medium text-black">TUE</div>
                             </div>
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1" id="day-3">
+                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-3">
                                 <div class="text-xs font-bold text-zinc-500">24</div>
                                 <div class="text-base font-medium text-black">WED</div>
                             </div>
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1" id="day-4">
+                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-4">
                                 <div class="text-xs font-bold text-zinc-500">25</div>
                                 <div class="text-base font-medium text-black">THU</div>
                             </div>
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1" id="day-5">
+                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-5">
                                 <div class="text-xs font-bold text-zinc-500">26</div>
                                 <div class="text-base font-medium text-black">FRI</div>
                             </div>
-                            <div class="flex-1 bg-neutral-50 border-r border-b border-slate-200 px-2 py-1" id="day-6">
+                            <div class="flex-1 bg-neutral-50 border-r border-b border-slate-200 px-2 py-1 day-header" id="day-6">
                                 <div class="text-xs font-bold text-zinc-500">27</div>
                                 <div class="text-base font-medium text-black">SAT</div>
                             </div>
@@ -444,7 +560,7 @@
                     </div>
                     
                     <!-- Time Rows -->
-                    <div id="calendarGrid"></div>
+                    <div id="calendarGrid" class="relative"></div>
                 </div>
             </div>
         </div>
@@ -625,6 +741,8 @@
         let lastMovedTask = null;
         let lastDeletedData = null;
         let undoTimeout = null;
+        let sidebarOpen = true;
+        let draggedFromQuadrant = null;
         
         const colorMap = {
             'violet': 'bg-violet-500',
@@ -966,6 +1084,25 @@
             });
         });
         
+        // Sidebar Toggle
+        function toggleSidebar() {
+            const sidebar = document.getElementById('accordionSidebar');
+            const toggle = document.getElementById('sidebarToggle');
+            const icon = document.getElementById('toggleIcon');
+            
+            sidebarOpen = !sidebarOpen;
+            
+            if (sidebarOpen) {
+                sidebar.classList.remove('sidebar-collapsed');
+                toggle.classList.add('sidebar-open');
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />';
+            } else {
+                sidebar.classList.add('sidebar-collapsed');
+                toggle.classList.remove('sidebar-open');
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />';
+            }
+        }
+        
         // Date Utilities
         function initializeWeekDates() {
             const today = new Date();
@@ -985,11 +1122,55 @@
                 date.setDate(startOfWeek.getDate() + i);
                 const dayElement = document.getElementById(`day-${i}`);
                 if (dayElement) {
+                    // Check if this is today
+                    const isToday = date.toDateString() === today.toDateString();
+                    const bgClass = isToday ? 'bg-blue-50' : (i === 0 || i === 6 ? 'bg-neutral-50' : 'bg-white');
+                    
+                    dayElement.className = `flex-1 border-r border-b border-slate-200 px-2 py-1 day-header ${bgClass}`;
                     dayElement.innerHTML = `
                         <div class="text-xs font-bold text-zinc-500">${date.getDate()}</div>
                         <div class="text-base font-medium text-black">${days[i]}</div>
                     `;
                 }
+            }
+            
+            // Add current time indicator
+            updateCurrentTimeLine();
+            // Update every minute
+            setInterval(updateCurrentTimeLine, 60000);
+        }
+        
+        // Update current time line
+        function updateCurrentTimeLine() {
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+            
+            // Only show between 7 AM and 9 PM
+            if (currentHour < 7 || currentHour >= 21) {
+                return;
+            }
+            
+            // Remove existing line
+            const existingLine = document.querySelector('.current-time-line');
+            if (existingLine) {
+                existingLine.remove();
+            }
+            
+            // Calculate position
+            const hourIndex = currentHour - 7; // 7 AM is index 0
+            const minutePercent = currentMinute / 60;
+            const blockHeight = 60; // Changed from 80 to 60
+            const topPosition = (hourIndex + minutePercent) * blockHeight + 44; // 44px for header
+            
+            // Create time line
+            const timeLine = document.createElement('div');
+            timeLine.className = 'current-time-line';
+            timeLine.style.top = `${topPosition}px`;
+            
+            const calendarGrid = document.getElementById('calendarGrid');
+            if (calendarGrid) {
+                calendarGrid.appendChild(timeLine);
             }
         }
         
@@ -1025,12 +1206,18 @@
                     
                     html += `
                         <div class="flex-1 border-r border-slate-200">
-                            <div class="${dayBgClass} calendar-block border-b border-slate-200 h-20 relative"${styleAttr}
+                            <div class="${dayBgClass} calendar-block border-b border-slate-200 h-[60px] relative"${styleAttr}
                                  data-day="${day}" 
                                  data-hour="${hourIndex}"
+                                 onclick="handleCalendarBlockClick(event)"
                                  ondragover="handleCalendarDragOver(event)"
                                  ondragleave="handleCalendarDragLeave(event)"
                                  ondrop="handleCalendarDrop(event)">
+                                <div class="add-task-icon">
+                                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                </div>
                             </div>
                         </div>
                     `;
@@ -1043,6 +1230,31 @@
             });
             
             grid.innerHTML = html;
+        }
+        
+        // Handle calendar block click to create task
+        function handleCalendarBlockClick(event) {
+            // Only open drawer if clicking on empty space (not on a task)
+            if (event.target.closest('.calendar-task')) {
+                return;
+            }
+            
+            const block = event.currentTarget;
+            const day = parseInt(block.dataset.day);
+            const hour = parseInt(block.dataset.hour);
+            
+            // Check if there's room for more tasks
+            const tasksInCell = calendarTasks.filter(ct => 
+                ct.day === day && ct.hour === hour
+            );
+            
+            if (tasksInCell.length >= 2) {
+                showToast('该时间块已满，最多只能放置2个任务');
+                return;
+            }
+            
+            // Open drawer to create new task
+            openDrawer('create');
         }
         
         // Drawer Functions
@@ -1196,6 +1408,11 @@
                         quadrantContainer.appendChild(createTaskElement(task));
                     }
                 });
+                
+                // Add drag and drop support to quadrant zones
+                document.querySelectorAll('#taskSections .task-list').forEach(list => {
+                    setupQuadrantDropZone(list);
+                });
             }
             
             // Render thisweek section - always show all quadrants
@@ -1255,12 +1472,25 @@
         
         function createSimpleTaskElement(task) {
             const div = document.createElement('div');
-            div.className = 'task-card bg-white border-l-0 border-r border-t border-b border-slate-200 rounded h-10 flex items-center gap-1 pr-2';
+            
+            // Check if task is in calendar
+            const isInCalendar = calendarTasks.some(ct => ct.taskId === task.id);
+            const addedClass = isInCalendar ? 'task-added-to-calendar' : '';
+            
+            div.className = `task-card bg-white border-l-0 border-r border-t border-b border-slate-200 rounded h-10 flex items-center gap-1 pr-2 ${addedClass}`;
             div.draggable = true;
             div.dataset.taskId = task.id;
+            div.dataset.quadrant = task.quadrant;
+            
+            // Calendar icon if added to calendar
+            const calendarIcon = isInCalendar ? `
+                <svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+            ` : '';
             
             div.innerHTML = `
-                <div class="${colorMap[task.color]} h-full w-1 flex-shrink-0 rounded-l"></div>
+                <div class="${colorMap[task.color]} task-bar h-full w-1 flex-shrink-0 rounded-l"></div>
                 <div class="flex items-center justify-center w-4 h-4 flex-shrink-0 ml-1">
                     <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
@@ -1268,7 +1498,8 @@
                         <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
                     </svg>
                 </div>
-                <div class="flex-1 text-sm text-gray-800 truncate">${escapeHtml(task.name)}</div>
+                ${calendarIcon}
+                <div class="flex-1 text-sm text-gray-800 truncate task-name">${escapeHtml(task.name)}</div>
                 <button class="edit-button w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded flex-shrink-0" onclick="event.stopPropagation(); openDrawer('edit', '${task.id}')" title="编辑任务">
                     <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -1284,6 +1515,7 @@
             // Drag events for accordion tasks
             div.addEventListener('dragstart', (e) => {
                 draggedTask = task;
+                draggedFromQuadrant = task.quadrant;
                 div.classList.add('dragging');
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/plain', task.id);
@@ -1292,8 +1524,12 @@
             div.addEventListener('dragend', (e) => {
                 div.classList.remove('dragging');
                 draggedTask = null;
+                draggedFromQuadrant = null;
                 document.querySelectorAll('.accordion-section-header').forEach(header => {
                     header.classList.remove('drag-over-section');
+                });
+                document.querySelectorAll('.quadrant-drop-zone').forEach(zone => {
+                    zone.classList.remove('drag-over-quadrant');
                 });
             });
             
@@ -1310,12 +1546,25 @@
         
         function createTaskElement(task) {
             const div = document.createElement('div');
-            div.className = 'task-card bg-white border-l-0 border-r border-t border-b border-slate-200 rounded h-10 flex items-center gap-1 pr-2';
+            
+            // Check if task is in calendar
+            const isInCalendar = calendarTasks.some(ct => ct.taskId === task.id);
+            const addedClass = isInCalendar ? 'task-added-to-calendar' : '';
+            
+            div.className = `task-card bg-white border-l-0 border-r border-t border-b border-slate-200 rounded h-10 flex items-center gap-1 pr-2 ${addedClass}`;
             div.draggable = true;
             div.dataset.taskId = task.id;
+            div.dataset.quadrant = task.quadrant;
+            
+            // Calendar icon if added to calendar
+            const calendarIcon = isInCalendar ? `
+                <svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+            ` : '';
             
             div.innerHTML = `
-                <div class="${colorMap[task.color]} h-full w-1 flex-shrink-0 rounded-l"></div>
+                <div class="${colorMap[task.color]} task-bar h-full w-1 flex-shrink-0 rounded-l"></div>
                 <div class="flex items-center justify-center w-4 h-4 flex-shrink-0 ml-1">
                     <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
@@ -1323,7 +1572,8 @@
                         <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
                     </svg>
                 </div>
-                <div class="flex-1 text-sm text-gray-800 truncate">${escapeHtml(task.name)}</div>
+                ${calendarIcon}
+                <div class="flex-1 text-sm text-gray-800 truncate task-name">${escapeHtml(task.name)}</div>
                 <button class="edit-button w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded flex-shrink-0" onclick="event.stopPropagation(); openDrawer('edit', '${task.id}')" title="编辑任务">
                     <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -1339,6 +1589,7 @@
             // Drag events for accordion tasks
             div.addEventListener('dragstart', (e) => {
                 draggedTask = task;
+                draggedFromQuadrant = task.quadrant;
                 div.classList.add('dragging');
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/plain', task.id);
@@ -1347,9 +1598,13 @@
             div.addEventListener('dragend', (e) => {
                 div.classList.remove('dragging');
                 draggedTask = null;
+                draggedFromQuadrant = null;
                 // Remove hover states from all sections
                 document.querySelectorAll('.accordion-section-header').forEach(header => {
                     header.classList.remove('drag-over-section');
+                });
+                document.querySelectorAll('.quadrant-drop-zone').forEach(zone => {
+                    zone.classList.remove('drag-over-quadrant');
                 });
             });
             
@@ -1368,6 +1623,60 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+        
+        // Setup quadrant drop zone for drag and drop within same section
+        function setupQuadrantDropZone(listElement) {
+            if (!listElement) return;
+            
+            const quadrantDiv = listElement.closest('[id^="quadrant-"]');
+            if (!quadrantDiv) return;
+            
+            const quadrantName = quadrantDiv.id.replace('quadrant-', '');
+            
+            listElement.classList.add('quadrant-drop-zone');
+            
+            listElement.addEventListener('dragover', (e) => {
+                if (draggedTask && !draggedCalendarTask && draggedTask.section === 'planning') {
+                    e.preventDefault();
+                    listElement.classList.add('drag-over-quadrant');
+                }
+            });
+            
+            listElement.addEventListener('dragleave', (e) => {
+                if (e.target === listElement) {
+                    listElement.classList.remove('drag-over-quadrant');
+                }
+            });
+            
+            listElement.addEventListener('drop', (e) => {
+                e.preventDefault();
+                listElement.classList.remove('drag-over-quadrant');
+                
+                if (draggedTask && draggedFromQuadrant !== quadrantName && draggedTask.section === 'planning') {
+                    // Update task quadrant
+                    const task = tasks.find(t => t.id === draggedTask.id);
+                    if (task) {
+                        const oldQuadrant = task.quadrant;
+                        task.quadrant = quadrantName;
+                        
+                        saveDataToSupabase();
+                        renderTasks();
+                        showToast(`任务已移至"${quadrantName}"`);
+                    }
+                }
+            });
+        }
+        
+        // Toggle task completion in calendar
+        function toggleTaskCompletion(calendarTaskId) {
+            const calendarTask = calendarTasks.find(ct => ct.id === calendarTaskId);
+            if (calendarTask) {
+                calendarTask.completed = !calendarTask.completed;
+                saveDataToSupabase();
+                renderCalendarTasks();
+                showToast(calendarTask.completed ? '任务已完成' : '任务标记为未完成');
+            }
         }
         
         function deleteTask(taskId) {
@@ -1551,15 +1860,27 @@
                     tasks.sort((a, b) => (a.position || 0) - (b.position || 0));
                     
                     const taskCount = tasks.length;
-                    const taskHeight = taskCount === 1 ? '76px' : '36px'; // 80px cell - 4px padding
+                    const taskHeight = taskCount === 1 ? '56px' : '28px'; // 60px cell - 4px padding
                     
                     tasks.forEach((ct, index) => {
                         const taskEl = document.createElement('div');
-                        taskEl.className = 'calendar-task bg-white border border-slate-200 rounded flex items-center gap-1 px-2 cursor-move shadow-sm hover:shadow-md transition-shadow';
+                        const completedClass = ct.completed ? 'completed' : '';
+                        taskEl.className = `calendar-task bg-white border border-slate-200 rounded flex items-center gap-1 px-2 cursor-move shadow-sm hover:shadow-md transition-shadow ${completedClass}`;
                         taskEl.draggable = true;
                         taskEl.style.height = taskHeight;
-                        taskEl.style.top = taskCount === 1 ? '2px' : `${2 + index * 40}px`;
+                        taskEl.style.top = taskCount === 1 ? '2px' : `${2 + index * 30}px`;
                         taskEl.title = `${ct.name}`;
+                        
+                        // Check icon or checkmark based on completion
+                        const checkIcon = ct.completed ? `
+                            <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                        ` : `
+                            <svg class="w-4 h-4 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="9" stroke-width="2"/>
+                            </svg>
+                        `;
                         
                         taskEl.innerHTML = `
                             <div class="${colorMap[ct.color]} h-full w-1 flex-shrink-0 rounded-l"></div>
@@ -1570,7 +1891,10 @@
                                     <circle cx="12" cy="18" r="1" fill="currentColor"/>
                                 </svg>
                             </div>
-                            <div class="flex-1 text-xs text-gray-800 truncate">${escapeHtml(ct.name)}</div>
+                            <div class="flex-1 text-xs text-gray-800 truncate task-name">${escapeHtml(ct.name)}</div>
+                            <button class="check-button w-5 h-5 flex items-center justify-center hover:bg-green-50 rounded flex-shrink-0 transition-colors" title="${ct.completed ? '标记为未完成' : '标记为完成'}" type="button">
+                                ${checkIcon}
+                            </button>
                             <button class="close-button w-5 h-5 flex items-center justify-center hover:bg-red-50 rounded flex-shrink-0 text-gray-500 hover:text-red-600 transition-colors" title="移除" type="button">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1590,6 +1914,18 @@
                             draggedCalendarTask = null;
                         });
                         
+                        // Check button click handler
+                        const checkBtn = taskEl.querySelector('.check-button');
+                        checkBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            toggleTaskCompletion(ct.id);
+                        });
+                        
+                        // Prevent drag when clicking check button
+                        checkBtn.addEventListener('mousedown', (e) => {
+                            e.stopPropagation();
+                        });
+                        
                         // Close button click handler
                         const closeBtn = taskEl.querySelector('.close-button');
                         closeBtn.addEventListener('click', (e) => {
@@ -1602,6 +1938,7 @@
                             remaining.forEach((t, i) => t.position = i);
                             saveDataToSupabase();
                             renderCalendarTasks();
+                            renderTasks(); // Re-render to update calendar icon status
                             showToast('已从日历移除');
                         });
                         
