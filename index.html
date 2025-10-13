@@ -1059,8 +1059,11 @@
         // =================================================================
         
         document.addEventListener('DOMContentLoaded', async () => {
-            initializeWeekDates();
+            // Generate calendar grid first
             generateCalendarGrid();
+            
+            // Then initialize week dates and time line
+            initializeWeekDates();
             
             // Check auth state first
             await checkAuthState();
@@ -1851,7 +1854,7 @@
         }
         
         function renderCalendarTasks() {
-            // Clear all calendar tasks
+            // Clear all calendar tasks (but preserve time line)
             document.querySelectorAll('.calendar-task').forEach(el => el.remove());
             
             // Group tasks by cell (80px blocks)
