@@ -137,16 +137,13 @@
         }
         
         /* Task added to calendar indicator */
-        .task-added-to-calendar {
-            opacity: 0.5;
-        }
-        
         .task-added-to-calendar .task-bar {
             opacity: 0.3;
         }
         
         .task-added-to-calendar .task-name {
-            color: #9ca3af;
+            color: #686f79;
+            font-weight: 400;
         }
         
         /* Quadrant drop zone */
@@ -1518,7 +1515,7 @@
                     </svg>
                 </div>
                 ${calendarIcon}
-                <div class="flex-1 text-sm text-gray-800 truncate task-name">${escapeHtml(task.name)}</div>
+                <div class="flex-1 text-sm font-medium truncate task-name" style="color: #1e1e1e;">${escapeHtml(task.name)}</div>
                 <button class="edit-button w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded flex-shrink-0" onclick="event.stopPropagation(); openDrawer('edit', '${task.id}')" title="编辑任务">
                     <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -1592,7 +1589,7 @@
                     </svg>
                 </div>
                 ${calendarIcon}
-                <div class="flex-1 text-sm text-gray-800 truncate task-name">${escapeHtml(task.name)}</div>
+                <div class="flex-1 text-sm font-medium truncate task-name" style="color: #1e1e1e;">${escapeHtml(task.name)}</div>
                 <button class="edit-button w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded flex-shrink-0" onclick="event.stopPropagation(); openDrawer('edit', '${task.id}')" title="编辑任务">
                     <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
