@@ -1607,11 +1607,14 @@
             
             div.innerHTML = `
                 <div class="${colorMap[task.color]} task-bar h-full w-1 flex-shrink-0 rounded-l"></div>
-                <div class="flex items-center justify-center w-4 h-4 flex-shrink-0 ml-1">
-                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
-                        <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                        <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
+                <div class="flex items-center justify-center w-4 h-4 flex-shrink-0" style="padding: 0 4px;">
+                    <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                        <circle cx="5.5" cy="4" r="1.5" fill="#767676"/>
+                        <circle cx="10.5" cy="4" r="1.5" fill="#767676"/>
+                        <circle cx="5.5" cy="8" r="1.5" fill="#767676"/>
+                        <circle cx="10.5" cy="8" r="1.5" fill="#767676"/>
+                        <circle cx="5.5" cy="12" r="1.5" fill="#767676"/>
+                        <circle cx="10.5" cy="12" r="1.5" fill="#767676"/>
                     </svg>
                 </div>
                 ${calendarIcon}
@@ -1681,11 +1684,14 @@
             
             div.innerHTML = `
                 <div class="${colorMap[task.color]} task-bar h-full w-1 flex-shrink-0 rounded-l"></div>
-                <div class="flex items-center justify-center w-4 h-4 flex-shrink-0 ml-1">
-                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
-                        <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                        <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
+                <div class="flex items-center justify-center w-4 h-4 flex-shrink-0" style="padding: 0 4px;">
+                    <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                        <circle cx="5.5" cy="4" r="1.5" fill="#767676"/>
+                        <circle cx="10.5" cy="4" r="1.5" fill="#767676"/>
+                        <circle cx="5.5" cy="8" r="1.5" fill="#767676"/>
+                        <circle cx="10.5" cy="8" r="1.5" fill="#767676"/>
+                        <circle cx="5.5" cy="12" r="1.5" fill="#767676"/>
+                        <circle cx="10.5" cy="12" r="1.5" fill="#767676"/>
                     </svg>
                 </div>
                 ${calendarIcon}
@@ -2002,11 +2008,14 @@
                         
                         taskEl.innerHTML = `
                             <div class="${colorMap[ct.color]} h-full w-1 flex-shrink-0 rounded-l"></div>
-                            <div class="flex items-center justify-center w-3 h-3 flex-shrink-0 ml-1">
-                                <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <circle cx="12" cy="6" r="1" fill="currentColor"/>
-                                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
-                                    <circle cx="12" cy="18" r="1" fill="currentColor"/>
+                            <div class="flex items-center justify-center w-3 h-3 flex-shrink-0" style="padding: 0 4px;">
+                                <svg class="w-3 h-3" viewBox="0 0 16 16" fill="none">
+                                    <circle cx="5.5" cy="4" r="1" fill="#767676"/>
+                                    <circle cx="10.5" cy="4" r="1" fill="#767676"/>
+                                    <circle cx="5.5" cy="8" r="1" fill="#767676"/>
+                                    <circle cx="10.5" cy="8" r="1" fill="#767676"/>
+                                    <circle cx="5.5" cy="12" r="1" fill="#767676"/>
+                                    <circle cx="10.5" cy="12" r="1" fill="#767676"/>
                                 </svg>
                             </div>
                             <div class="flex-1 text-xs text-gray-800 truncate task-name ml-0.5">${escapeHtml(ct.name)}</div>
