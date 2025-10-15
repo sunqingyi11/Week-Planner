@@ -1241,8 +1241,8 @@
             // Calculate position
             const hourIndex = currentHour - 7; // 7 AM is index 0
             const minutePercent = currentMinute / 60;
-            const blockHeight = 60; // Changed from 80 to 60
-            const topPosition = (hourIndex + minutePercent) * blockHeight + 44; // 44px for header
+            const blockHeight = 60;
+            const topPosition = (hourIndex + minutePercent) * blockHeight; // Position relative to calendarGrid
             
             // Create time line
             const timeLine = document.createElement('div');
@@ -1603,7 +1603,7 @@
             
             div.innerHTML = `
                 <div class="${colorMap[task.color]} task-bar h-full w-1 flex-shrink-0 rounded-l"></div>
-                <div class="flex items-center justify-center flex-shrink-0" style="width: 16px; height: 16px; padding: 0 4px;">
+                <div class="flex items-center justify-center flex-shrink-0" style="width: 16px; height: 16px;">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <circle cx="5.5" cy="4" r="1.5" fill="#767676"/>
                         <circle cx="10.5" cy="4" r="1.5" fill="#767676"/>
@@ -1680,7 +1680,7 @@
             
             div.innerHTML = `
                 <div class="${colorMap[task.color]} task-bar h-full w-1 flex-shrink-0 rounded-l"></div>
-                <div class="flex items-center justify-center flex-shrink-0" style="width: 16px; height: 16px; padding: 0 4px;">
+                <div class="flex items-center justify-center flex-shrink-0" style="width: 16px; height: 16px;">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <circle cx="5.5" cy="4" r="1.5" fill="#767676"/>
                         <circle cx="10.5" cy="4" r="1.5" fill="#767676"/>
