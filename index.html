@@ -1372,12 +1372,8 @@
                 document.getElementById('taskId').value = '';
                 document.getElementById('taskColor').value = 'violet';
                 
-                // Set default quadrant based on where it's created from
-                if (fromCalendar) {
-                    document.getElementById('taskQuadrant').value = '不重要但紧急';
-                } else {
-                    document.getElementById('taskQuadrant').value = '重要不紧急';
-                }
+                // Set default quadrant to 重要不紧急 for both cases
+                document.getElementById('taskQuadrant').value = '重要不紧急';
                 
                 selectColor('violet');
             }
@@ -1446,7 +1442,7 @@
                     name,
                     quadrant,
                     color,
-                    section: 'planning'
+                    section: pendingCalendarPosition ? 'thisweek' : 'planning' // If from calendar, save to thisweek
                 };
                 tasks.push(newTask);
                 
@@ -1607,8 +1603,8 @@
             
             div.innerHTML = `
                 <div class="${colorMap[task.color]} task-bar h-full w-1 flex-shrink-0 rounded-l"></div>
-                <div class="flex items-center justify-center w-4 h-4 flex-shrink-0" style="padding: 0 4px;">
-                    <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                <div class="flex items-center justify-center flex-shrink-0" style="width: 16px; height: 16px; padding: 0 4px;">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <circle cx="5.5" cy="4" r="1.5" fill="#767676"/>
                         <circle cx="10.5" cy="4" r="1.5" fill="#767676"/>
                         <circle cx="5.5" cy="8" r="1.5" fill="#767676"/>
@@ -1684,8 +1680,8 @@
             
             div.innerHTML = `
                 <div class="${colorMap[task.color]} task-bar h-full w-1 flex-shrink-0 rounded-l"></div>
-                <div class="flex items-center justify-center w-4 h-4 flex-shrink-0" style="padding: 0 4px;">
-                    <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                <div class="flex items-center justify-center flex-shrink-0" style="width: 16px; height: 16px; padding: 0 4px;">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <circle cx="5.5" cy="4" r="1.5" fill="#767676"/>
                         <circle cx="10.5" cy="4" r="1.5" fill="#767676"/>
                         <circle cx="5.5" cy="8" r="1.5" fill="#767676"/>
@@ -2008,8 +2004,8 @@
                         
                         taskEl.innerHTML = `
                             <div class="${colorMap[ct.color]} h-full w-1 flex-shrink-0 rounded-l"></div>
-                            <div class="flex items-center justify-center w-3 h-3 flex-shrink-0" style="padding: 0 4px;">
-                                <svg class="w-3 h-3" viewBox="0 0 16 16" fill="none">
+                            <div class="flex items-center justify-center flex-shrink-0" style="width: 16px; height: 16px; padding: 0 4px;">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                                     <circle cx="5.5" cy="4" r="1" fill="#767676"/>
                                     <circle cx="10.5" cy="4" r="1" fill="#767676"/>
                                     <circle cx="5.5" cy="8" r="1" fill="#767676"/>
