@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.1.0">
+    <meta name="version" content="1.1.1">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -707,43 +707,43 @@
                     </button>
                 </div>
                 
-                <!-- Calendar Grid -->
-                <div class="bg-white rounded-tl-3xl rounded-tr-3xl overflow-hidden shadow-sm">
-                    <!-- Week Days Header (Sticky) -->
-                    <div class="flex sticky top-[76px] z-40 bg-white">
-                        <div class="w-16 flex-shrink-0 pl-2"></div>
-                        <div class="flex flex-1">
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-0">
-                                <div class="text-xs font-bold text-zinc-500">21</div>
-                                <div class="text-base font-medium text-black">周日</div>
-                            </div>
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-1">
-                                <div class="text-xs font-bold text-zinc-500">22</div>
-                                <div class="text-base font-medium text-black">周一</div>
-                            </div>
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-2">
-                                <div class="text-xs font-bold text-zinc-500">23</div>
-                                <div class="text-base font-medium text-black">周二</div>
-                            </div>
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-3">
-                                <div class="text-xs font-bold text-zinc-500">24</div>
-                                <div class="text-base font-medium text-black">周三</div>
-                            </div>
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-4">
-                                <div class="text-xs font-bold text-zinc-500">25</div>
-                                <div class="text-base font-medium text-black">周四</div>
-                            </div>
-                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-5">
-                                <div class="text-xs font-bold text-zinc-500">26</div>
-                                <div class="text-base font-medium text-black">周五</div>
-                            </div>
-                            <div class="flex-1 bg-white border-b border-slate-200 px-2 py-1 day-header" id="day-6">
-                                <div class="text-xs font-bold text-zinc-500">27</div>
-                                <div class="text-base font-medium text-black">周六</div>
-                            </div>
+                <!-- Week Days Header (Sticky) -->
+                <div class="flex sticky top-[76px] z-40 bg-white">
+                    <div class="w-16 flex-shrink-0 pl-2"></div>
+                    <div class="flex flex-1">
+                        <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-0">
+                            <div class="text-xs font-bold text-zinc-500">21</div>
+                            <div class="text-base font-medium text-black">周日</div>
+                        </div>
+                        <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-1">
+                            <div class="text-xs font-bold text-zinc-500">22</div>
+                            <div class="text-base font-medium text-black">周一</div>
+                        </div>
+                        <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-2">
+                            <div class="text-xs font-bold text-zinc-500">23</div>
+                            <div class="text-base font-medium text-black">周二</div>
+                        </div>
+                        <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-3">
+                            <div class="text-xs font-bold text-zinc-500">24</div>
+                            <div class="text-base font-medium text-black">周三</div>
+                        </div>
+                        <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-4">
+                            <div class="text-xs font-bold text-zinc-500">25</div>
+                            <div class="text-base font-medium text-black">周四</div>
+                        </div>
+                        <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-5">
+                            <div class="text-xs font-bold text-zinc-500">26</div>
+                            <div class="text-base font-medium text-black">周五</div>
+                        </div>
+                        <div class="flex-1 bg-white border-b border-slate-200 px-2 py-1 day-header" id="day-6">
+                            <div class="text-xs font-bold text-zinc-500">27</div>
+                            <div class="text-base font-medium text-black">周六</div>
                         </div>
                     </div>
-                    
+                </div>
+                
+                <!-- Calendar Grid -->
+                <div class="bg-white shadow-sm">
                     <!-- Time Rows -->
                     <div id="calendarGrid" class="relative"></div>
                 </div>
@@ -946,8 +946,8 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.1.0 Loaded');
-        console.log('✅ 已修复日历表头位置，现在表头是表格的第一行并且置顶');
+        console.log('Week Plan App - Version 1.1.1 Loaded');
+        console.log('✅ 已重新调整表头结构，确保7 AM行在表头下方');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
