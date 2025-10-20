@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.0.7">
+    <meta name="version" content="1.0.9">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -561,13 +561,6 @@
                             </button>
                         </div>
                     </div>
-                    <!-- Clear Completed Status Button -->
-                    <button id="clearStatusBtn" onclick="showClearStatusConfirmation()" class="w-full text-xs text-gray-600 hover:text-gray-800 py-1.5 px-2 rounded hover:bg-slate-50 transition-colors flex items-center justify-center gap-1 hidden" title="将所有已完成的任务恢复为未完成">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        清除完成状态
-                    </button>
                 </div>
             </div>
             
@@ -578,17 +571,18 @@
                      ondragleave="handleSectionDragLeave(event)"
                      ondrop="handleSectionDrop(event, 'planning')">
                     <h3 class="text-xl font-medium text-black cursor-pointer flex-1" onclick="toggleSection('planning')">计划中 (<span id="planningCount">0</span>)</h3>
-                    <button id="planningAddBtn" onclick="event.stopPropagation(); openDrawerForSection('planning')" class="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors" title="添加任务">
+                    <svg id="planningChevron" class="w-6 h-6 transform rotate-180 transition-transform cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24" onclick="toggleSection('planning')">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </div>
+                <div id="planningContent" class="px-6 pt-4 pb-6 space-y-6 overflow-y-auto flex-1">
+                    <!-- Add Task Button -->
+                    <button id="planningAddBtn" onclick="openDrawerForSection('planning')" class="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors" title="添加任务">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                         </svg>
                         <span id="planningAddBtnText">添加任务</span>
                     </button>
-                    <svg id="planningChevron" class="w-6 h-6 transform rotate-180 transition-transform ml-2 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24" onclick="toggleSection('planning')">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
-                <div id="planningContent" class="px-6 pb-6 space-y-6 overflow-y-auto flex-1">
                     <!-- Empty State -->
                     <div id="emptyState" class="flex items-center justify-center py-32">
                         <button onclick="openDrawer('create')" class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
@@ -600,12 +594,6 @@
                     </div>
                     <!-- Task Sections -->
                     <div id="taskSections" class="space-y-6 hidden pb-4">
-                        <button onclick="openDrawer('create')" class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 mb-4">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                            </svg>
-                            添加任务
-                        </button>
                         <div id="quadrant-重要不紧急" class="space-y-4">
                             <div class="text-xs text-gray-500 font-medium">重要不紧急</div>
                             <div class="space-y-2 task-list min-h-[20px]"></div>
@@ -633,17 +621,18 @@
                      ondragleave="handleSectionDragLeave(event)"
                      ondrop="handleSectionDrop(event, 'thisweek')">
                     <h3 class="text-xl font-medium text-black cursor-pointer flex-1" onclick="toggleSection('thisweek')">本周要务 (<span id="thisweekCount">0</span>)</h3>
-                    <button id="thisweekAddBtn" onclick="event.stopPropagation(); openDrawerForSection('thisweek')" class="flex items-center gap-2 px-3 py-1.5 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 transition-colors" title="添加任务">
+                    <svg id="thisweekChevron" class="w-6 h-6 transition-transform cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24" onclick="toggleSection('thisweek')">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </div>
+                <div id="thisweekContent" class="px-6 pt-4 pb-6 space-y-6 hidden overflow-y-auto flex-1">
+                    <!-- Add Task Button -->
+                    <button id="thisweekAddBtn" onclick="openDrawerForSection('thisweek')" class="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors" title="添加任务">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                         </svg>
                         <span id="thisweekAddBtnText">添加任务</span>
                     </button>
-                    <svg id="thisweekChevron" class="w-6 h-6 transition-transform ml-2 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24" onclick="toggleSection('thisweek')">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
-                <div id="thisweekContent" class="px-6 pb-6 space-y-6 hidden overflow-y-auto flex-1">
                     <!-- Quadrant sections always visible -->
                     <div id="thisweek-quadrant-重要不紧急" class="space-y-4">
                         <div class="text-xs text-gray-500 font-medium">重要不紧急</div>
@@ -957,8 +946,8 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.0.7 Loaded');
-        console.log('✅ 已修复：日历表头置顶、侧边栏收起自适应、添加按钮样式、选中状态');
+        console.log('Week Plan App - Version 1.0.9 Loaded');
+        console.log('✅ 已将添加任务按钮移到每个section内容区域的顶部');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -2813,14 +2802,11 @@
         
         // Update clear status button visibility
         function updateClearStatusButton(finishedCount) {
-            const sidebarBtn = document.getElementById('clearStatusBtn');
             const calendarBtn = document.getElementById('clearStatusBtnCalendar');
             
             if (finishedCount > 0) {
-                if (sidebarBtn) sidebarBtn.classList.remove('hidden');
                 if (calendarBtn) calendarBtn.classList.remove('hidden');
             } else {
-                if (sidebarBtn) sidebarBtn.classList.add('hidden');
                 if (calendarBtn) calendarBtn.classList.add('hidden');
             }
         }
