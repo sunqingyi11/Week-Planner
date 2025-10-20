@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.4.5">
+    <meta name="version" content="1.4.6">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -697,7 +697,7 @@
         <div class="flex-1 flex flex-col calendar-container overflow-y-auto" style="background-color: #f7f9fa;">
             <div class="calendar-grid-wrapper px-8">
                 <!-- Calendar Header (Sticky) -->
-                <div id="calendarHeader" class="sticky top-0 z-10 py-4 flex items-center justify-between pl-2 transition-shadow" style="background-color: #f7f9fa; opacity: 0;">
+                <div id="calendarHeader" class="sticky top-0 z-[100] py-4 flex items-center justify-between pl-2 transition-shadow" style="background-color: #f7f9fa; opacity: 0;">
                     <div class="flex items-center gap-2.5">
                         <!-- Expand Sidebar Button (only visible when sidebar is collapsed) -->
                         <button id="expandSidebarBtn" onclick="toggleSidebar()" class="calendar-header-toggle w-6 h-6 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-all hidden" title="展开侧边栏">
@@ -720,7 +720,7 @@
                 </div>
                 
                 <!-- Week Days Header (Sticky) with cover layer -->
-                <div id="weekDaysHeader" class="sticky z-20 transition-shadow" style="top: 68px; opacity: 0;">
+                <div id="weekDaysHeader" class="sticky z-[90] transition-shadow" style="top: 68px; opacity: 0;">
                     <!-- Cover layer to prevent content from showing through -->
                     <div class="absolute inset-x-0 -top-10 h-10" style="background-color: #f7f9fa;"></div>
                     <div class="flex bg-white rounded-tl-3xl rounded-tr-3xl overflow-hidden relative">
@@ -962,9 +962,9 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.4.5 Loaded - Critical Fixes');
+        console.log('Week Plan App - Version 1.4.6 Loaded - Z-index Complete Fix');
         console.log('✅ 修复：表单提交事件监听器绑定时机问题（移入DOMContentLoaded）');
-        console.log('✅ 修复：drawer和backdrop的z-index层级（drawer: 10000, backdrop: 9999）');
+        console.log('✅ 修复：完整的z-index层级（drawer:10000, backdrop:9999, calendarHeader:100, weekDays:90, sidebar:50）');
         console.log('✅ 修复：weekDaysHeader遮罩层不遮挡日期标题');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
