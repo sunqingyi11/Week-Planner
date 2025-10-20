@@ -37,6 +37,24 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         
+        /* Task selected state */
+        .task-card.task-selected {
+            background-color: rgba(0, 0, 0, 0.03);
+        }
+        
+        .task-card.task-selected .task-bar {
+            opacity: 0.5;
+        }
+        
+        .calendar-task.task-selected {
+            background-color: rgba(0, 0, 0, 0.03);
+            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+        }
+        
+        .calendar-task.task-selected > div:first-child {
+            opacity: 0.5;
+        }
+        
         .calendar-block {
             min-height: 40px;
             position: relative;
@@ -66,27 +84,38 @@
             }
         }
         
-        @media (max-width: 767px) {
+        @media (max-width: 768px) {
             .sidebar {
                 position: fixed;
-                z-index: 55;
+                z-index: 50;
+            }
+            
+            /* Ensure drawer appears above sidebar on mobile */
+            .drawer {
+                z-index: 60 !important;
+            }
+            
+            #drawerBackdrop {
+                z-index: 55 !important;
             }
         }
         
         .sidebar {
-            transition: transform 0.3s ease;
+            transition: transform 0.3s ease-in-out;
             position: relative;
         }
         
         .sidebar-collapsed {
             transform: translateX(-100%);
-            position: absolute;
         }
         
         /* Calendar view expansion when sidebar is collapsed */
+        .calendar-container {
+            transition: margin-left 0.3s ease-in-out, width 0.3s ease-in-out;
+        }
+        
         .calendar-expanded {
             margin-left: 0 !important;
-            width: 100% !important;
         }
         
         /* Calendar block hover effect for adding tasks */
@@ -117,6 +146,7 @@
             background-color: #ef4444;
             z-index: 20;
             pointer-events: none;
+            width: calc(100% - 40px);
         }
         
         .current-time-line::before {
@@ -128,6 +158,21 @@
             height: 10px;
             border-radius: 50%;
             background-color: #ef4444;
+        }
+        
+        /* Mobile current time line */
+        @media (max-width: 768px) {
+            .current-time-line {
+                display: block !important;
+                left: 40px;
+                width: calc(100% - 40px);
+                min-width: 760px; /* Match calendar grid min-width */
+                z-index: 25;
+            }
+            
+            .current-time-line::before {
+                display: block !important;
+            }
         }
         
         /* Task in calendar - completed state */
@@ -258,10 +303,42 @@
             z-index: 1000;
             opacity: 0;
             transition: opacity 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            max-width: 90vw;
         }
         
         .toast.show {
             opacity: 1;
+        }
+        
+        .toast span {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .toast button {
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+        
+        /* Mobile toast optimizations */
+        @media (max-width: 768px) {
+            .toast {
+                flex-direction: row;
+                justify-content: space-between;
+                padding: 10px 16px;
+                font-size: 14px;
+                min-width: 280px;
+            }
+            
+            .toast span {
+                flex: 0 1 auto;
+                max-width: 180px;
+            }
         }
         
         .edit-button {
@@ -305,6 +382,46 @@
                 user-select: none;
                 -webkit-touch-callout: none;
             }
+            
+            /* Disable context menu on mobile */
+            .calendar-task, .calendar-block {
+                -webkit-touch-callout: none;
+            }
+        }
+        
+        /* Long press context menu */
+        .context-menu {
+            position: fixed;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            min-width: 150px;
+            display: none;
+        }
+        
+        .context-menu.show {
+            display: block;
+        }
+        
+        .context-menu-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 14px;
+        }
+        
+        .context-menu-item:hover {
+            background-color: #f7fafc;
+        }
+        
+        .context-menu-item:first-child {
+            border-radius: 8px 8px 0 0;
+        }
+        
+        .context-menu-item:last-child {
+            border-radius: 0 0 8px 8px;
         }
     </style>
 </head>
@@ -318,7 +435,7 @@
     </div>
     
     <!-- Backdrop Overlay -->
-    <div id="drawerBackdrop" class="fixed inset-0 bg-black bg-opacity-30 z-40 hidden transition-opacity" onclick="closeDrawer()"></div>
+    <div id="drawerBackdrop" class="fixed inset-0 bg-black bg-opacity-30 z-40 hidden transition-opacity" onclick="closeDrawer()" style="z-index: 45;"></div>
     
     <!-- Main Container -->
     <div class="flex h-screen">
@@ -401,9 +518,9 @@
                 <!-- Logged Out State -->
                 <div id="loggedOutState" class="flex flex-col h-screen justify-center px-6 py-8 relative">
                     <!-- Collapse Sidebar Button for logged out state -->
-                    <button onclick="toggleSidebar()" class="sidebar-collapse-btn absolute top-4 right-4 w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded transition-colors" title="收起侧边栏">
+                    <button onclick="toggleSidebar()" class="sidebar-collapse-btn absolute top-4 right-4 w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-all" title="收起侧边栏">
                         <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                         </svg>
                     </button>
                     <div class="space-y-6">
@@ -422,7 +539,7 @@
                 
                 <!-- Logged In State -->
                 <div id="loggedInState" class="border-b border-slate-200 px-6 py-3 hidden">
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between mb-2">
                         <div class="flex flex-col gap-0.5">
                             <h2 class="text-base font-semibold text-black">Week Planner</h2>
                             <p id="userEmail" class="text-xs font-light text-gray-500">user@example.com</p>
@@ -437,25 +554,37 @@
                                 登出
                             </button>
                             <!-- Collapse Sidebar Button -->
-                            <button onclick="toggleSidebar()" class="sidebar-collapse-btn w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded transition-colors" title="收起侧边栏">
+                            <button onclick="toggleSidebar()" class="sidebar-collapse-btn w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-all" title="收起侧边栏">
                                 <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                                 </svg>
                             </button>
                         </div>
                     </div>
+                    <!-- Clear Completed Status Button -->
+                    <button id="clearStatusBtn" onclick="showClearStatusConfirmation()" class="w-full text-xs text-gray-600 hover:text-gray-800 py-1.5 px-2 rounded hover:bg-slate-50 transition-colors flex items-center justify-center gap-1 hidden" title="将所有已完成的任务恢复为未完成">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        清除完成状态
+                    </button>
                 </div>
             </div>
             
             <!-- Planning Section -->
             <div id="planningSection" class="border-b border-slate-200 flex flex-col accordion-section flex-1 min-h-0 hidden">
                 <div class="flex items-center justify-between px-6 accordion-section-header flex-shrink-0 h-[60px]" 
-                     onclick="toggleSection('planning')"
                      ondragover="handleSectionDragOver(event, 'planning')"
                      ondragleave="handleSectionDragLeave(event)"
                      ondrop="handleSectionDrop(event, 'planning')">
-                    <h3 class="text-xl font-medium text-black">计划中 (<span id="planningCount">0</span>)</h3>
-                    <svg id="planningChevron" class="w-6 h-6 transform rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <h3 class="text-xl font-medium text-black cursor-pointer flex-1" onclick="toggleSection('planning')">计划中 (<span id="planningCount">0</span>)</h3>
+                    <button id="planningAddBtn" onclick="event.stopPropagation(); openDrawer('create')" class="flex items-center gap-1 text-sm font-medium transition-colors" title="添加任务">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span id="planningAddBtnText">添加任务</span>
+                    </button>
+                    <svg id="planningChevron" class="w-6 h-6 transform rotate-180 transition-transform ml-2 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24" onclick="toggleSection('planning')">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
                 </div>
@@ -500,12 +629,17 @@
             <!-- This Week Section -->
             <div id="thisweekSection" class="border-b border-slate-200 flex flex-col accordion-section hidden">
                 <div class="flex items-center justify-between px-6 accordion-section-header flex-shrink-0 h-[60px]" 
-                     onclick="toggleSection('thisweek')"
                      ondragover="handleSectionDragOver(event, 'thisweek')"
                      ondragleave="handleSectionDragLeave(event)"
                      ondrop="handleSectionDrop(event, 'thisweek')">
-                    <h3 class="text-xl font-medium text-black">本周要务 (<span id="thisweekCount">0</span>)</h3>
-                    <svg id="thisweekChevron" class="w-6 h-6 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <h3 class="text-xl font-medium text-black cursor-pointer flex-1" onclick="toggleSection('thisweek')">本周要务 (<span id="thisweekCount">0</span>)</h3>
+                    <button id="thisweekAddBtn" onclick="event.stopPropagation(); openDrawerForSection('thisweek')" class="flex items-center gap-1 text-sm font-medium transition-colors" title="添加任务">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span id="thisweekAddBtnText">添加任务</span>
+                    </button>
+                    <svg id="thisweekChevron" class="w-6 h-6 transition-transform ml-2 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24" onclick="toggleSection('thisweek')">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
                 </div>
@@ -570,9 +704,9 @@
                 <!-- Calendar Header (Sticky) -->
                 <div class="bg-neutral-100 px-12 py-2.5 rounded-t-lg sticky top-0 z-30 relative">
                     <!-- Expand Sidebar Button (only visible when sidebar is collapsed) -->
-                    <button id="expandSidebarBtn" onclick="toggleSidebar()" class="calendar-header-toggle absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 flex items-center justify-center hover:bg-slate-200 rounded transition-colors hidden" title="展开侧边栏">
+                    <button id="expandSidebarBtn" onclick="toggleSidebar()" class="calendar-header-toggle absolute left-4 top-1/2 transform -translate-y-1/2 w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-all hidden" title="展开侧边栏">
                         <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
                         </svg>
                     </button>
                     <div class="text-base font-medium text-black" id="weekRange">本周安排: </div>
@@ -624,6 +758,16 @@
     
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
+    
+    <!-- Context Menu for Long Press -->
+    <div id="contextMenu" class="context-menu">
+        <div class="context-menu-item" onclick="contextMenuEdit()">
+            <span>✏️ 编辑</span>
+        </div>
+        <div class="context-menu-item" onclick="contextMenuDelete()">
+            <span class="text-red-600">🗑️ 删除</span>
+        </div>
+    </div>
     
     <!-- Login Modal -->
     <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
@@ -692,6 +836,24 @@
                 <p class="text-xs text-center text-gray-500">
                     还没有账号？ <button onclick="closeLoginModal(); showSignupModal()" class="text-slate-900 font-medium hover:underline">立即注册</button>
                 </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Clear Status Confirmation Modal -->
+    <div id="clearStatusModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div class="px-6 py-5">
+                <h2 class="text-lg font-semibold text-black mb-2">清除完成状态</h2>
+                <p class="text-sm text-gray-600 mb-4">确定要将所有已完成的任务恢复为未完成状态吗？此操作将把 <span id="completedTaskCount" class="font-semibold text-black">0</span> 个任务移回到"本周要务"。</p>
+                <div class="flex gap-3">
+                    <button onclick="closeClearStatusModal()" class="flex-1 border border-slate-200 text-slate-900 text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-50 transition-colors">
+                        取消
+                    </button>
+                    <button onclick="clearAllCompletedStatus()" class="flex-1 bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors">
+                        确认清除
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -800,6 +962,9 @@
         let sidebarOpen = true;
         let draggedFromQuadrant = null;
         let pendingCalendarPosition = null; // Store calendar position when creating from calendar
+        let selectedTaskId = null; // Track selected task for highlighting
+        let contextMenuTarget = null; // Track which task the context menu is for
+        let longPressTimer = null; // Timer for long press detection
         
         const colorMap = {
             'violet': 'bg-violet-500',
@@ -857,6 +1022,9 @@
             
             // Set user email
             document.getElementById('userEmail').textContent = user.email || 'user@example.com'
+            
+            // Setup real-time subscription
+            setupRealtimeSubscription()
         }
         
         // Update UI for logged out state
@@ -887,6 +1055,43 @@
         function closeSignupModal() {
             document.getElementById('signupModal').classList.add('hidden')
             document.getElementById('signupForm').reset()
+        }
+        
+        // Clear Status Modal
+        function showClearStatusConfirmation() {
+            const finishedTasks = tasks.filter(t => t.section === 'finished');
+            if (finishedTasks.length === 0) {
+                showToast('没有已完成的任务');
+                return;
+            }
+            
+            document.getElementById('completedTaskCount').textContent = finishedTasks.length;
+            document.getElementById('clearStatusModal').classList.remove('hidden');
+        }
+        
+        function closeClearStatusModal() {
+            document.getElementById('clearStatusModal').classList.add('hidden');
+        }
+        
+        function clearAllCompletedStatus() {
+            const finishedTasks = tasks.filter(t => t.section === 'finished');
+            
+            if (finishedTasks.length === 0) {
+                closeClearStatusModal();
+                return;
+            }
+            
+            // Move all finished tasks back to thisweek
+            finishedTasks.forEach(task => {
+                task.section = 'thisweek';
+            });
+            
+            const count = finishedTasks.length;
+            
+            saveDataToSupabase();
+            renderTasks();
+            closeClearStatusModal();
+            showToast(`已恢复 ${count} 个任务`);
         }
         
         // Google OAuth Sign In
@@ -1084,8 +1289,54 @@
                 return
             }
             
+            // Force save first
             await saveDataToSupabase()
+            // Then reload to ensure we have latest
             await loadDataFromSupabase()
+            showToast('数据同步成功')
+        }
+        
+        // Setup real-time subscription for data sync
+        let realtimeChannel = null;
+        
+        function setupRealtimeSubscription() {
+            if (!supabase || !currentUser) return;
+            
+            // Unsubscribe from previous channel if exists
+            if (realtimeChannel) {
+                supabase.removeChannel(realtimeChannel);
+            }
+            
+            // Subscribe to changes in user_tasks table
+            realtimeChannel = supabase
+                .channel('user_tasks_changes')
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'user_tasks',
+                        filter: `user_id=eq.${currentUser.id}`
+                    },
+                    (payload) => {
+                        console.log('📡 Real-time update received:', payload);
+                        
+                        // Reload data when changes detected
+                        if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+                            const newData = payload.new;
+                            if (newData && newData.user_id === currentUser.id) {
+                                tasks = newData.tasks || [];
+                                calendarTasks = newData.calendar_tasks || [];
+                                renderTasks();
+                                renderCalendarTasks();
+                                console.log('✅ UI updated from real-time sync');
+                            }
+                        }
+                    }
+                )
+                .subscribe((status) => {
+                    console.log('Real-time subscription status:', status);
+                });
         }
         
         // Listen for auth state changes
@@ -1096,7 +1347,13 @@
                     currentUser = session.user
                     updateUIForLoggedIn(session.user)
                     loadDataFromSupabase()
+                    setupRealtimeSubscription()
                 } else if (event === 'SIGNED_OUT') {
+                    // Cleanup real-time subscription
+                    if (realtimeChannel) {
+                        supabase.removeChannel(realtimeChannel);
+                        realtimeChannel = null;
+                    }
                     currentUser = null
                     updateUIForLoggedOut()
                 }
@@ -1345,6 +1602,34 @@
             openDrawer('create', null, true);
         }
         
+        // Open drawer for specific section
+        function openDrawerForSection(section) {
+            pendingCalendarPosition = null;
+            const drawer = document.getElementById('drawer');
+            const backdrop = document.getElementById('drawerBackdrop');
+            const title = document.getElementById('drawerTitle');
+            const form = document.getElementById('taskForm');
+            
+            drawer.classList.remove('drawer-closed');
+            drawer.classList.add('drawer-open');
+            backdrop.classList.remove('hidden');
+            
+            title.textContent = '添加任务';
+            form.reset();
+            document.getElementById('taskId').value = '';
+            document.getElementById('taskColor').value = 'violet';
+            document.getElementById('taskQuadrant').value = '重要不紧急';
+            selectColor('violet');
+            
+            // Store the target section
+            form.dataset.targetSection = section;
+            
+            // Focus on name input
+            setTimeout(() => {
+                document.getElementById('taskName').focus();
+            }, 100);
+        }
+        
         // Drawer Functions
         function openDrawer(mode, taskId = null, fromCalendar = false) {
             const drawer = document.getElementById('drawer');
@@ -1372,8 +1657,13 @@
                 document.getElementById('taskId').value = '';
                 document.getElementById('taskColor').value = 'violet';
                 
-                // Set default quadrant to 重要不紧急 for both cases
-                document.getElementById('taskQuadrant').value = '重要不紧急';
+                // Set default quadrant based on where task is created
+                // Calendar tasks default to "不重要但紧急", otherwise "重要不紧急"
+                if (fromCalendar) {
+                    document.getElementById('taskQuadrant').value = '不重要但紧急';
+                } else {
+                    document.getElementById('taskQuadrant').value = '重要不紧急';
+                }
                 
                 selectColor('violet');
             }
@@ -1437,12 +1727,13 @@
             } else {
                 // Create new task
                 const newTaskId = Date.now().toString();
+                const targetSection = form.dataset.targetSection || (pendingCalendarPosition ? 'thisweek' : 'planning');
                 const newTask = {
                     id: newTaskId,
                     name,
                     quadrant,
                     color,
-                    section: pendingCalendarPosition ? 'thisweek' : 'planning' // If from calendar, save to thisweek
+                    section: targetSection
                 };
                 tasks.push(newTask);
                 
@@ -1535,6 +1826,11 @@
                 }
             });
             
+            // Setup drag and drop for thisweek section to enable reordering
+            document.querySelectorAll('.thisweek-task-list').forEach(list => {
+                setupTaskReordering(list, 'thisweek');
+            });
+            
             // Render finished section - always show all quadrants
             finishedTasks.forEach(task => {
                 const quadrantContainer = document.querySelector(`#finished-quadrant-${task.quadrant} .finished-task-list`);
@@ -1548,8 +1844,18 @@
             document.getElementById('thisweekCount').textContent = thisweekTasks.length;
             document.getElementById('finishedCount').textContent = finishedTasks.length;
             
+            // Update add button styles based on task count
+            updateAddButtonStyles('planning', planningSectionTasks.length);
+            updateAddButtonStyles('thisweek', thisweekTasks.length);
+            
+            // Update clear status button visibility
+            updateClearStatusButton(finishedTasks.length);
+            
             // Render calendar tasks
             renderCalendarTasks();
+            
+            // Update task selection after rendering
+            updateTaskSelection();
         }
         
         function renderQuadrantSection(sectionName, sectionTasks) {
@@ -1656,6 +1962,22 @@
                 });
             });
             
+            // Click to select task
+            div.addEventListener('click', (e) => {
+                // Don't select if clicking on buttons
+                if (e.target.closest('button')) return;
+                
+                selectTask(task.id);
+            });
+            
+            // Double click to edit task
+            div.addEventListener('dblclick', (e) => {
+                // Don't edit if clicking on buttons
+                if (e.target.closest('button')) return;
+                
+                openDrawer('edit', task.id);
+            });
+            
             return div;
         }
         
@@ -1734,6 +2056,22 @@
                 });
             });
             
+            // Click to select task
+            div.addEventListener('click', (e) => {
+                // Don't select if clicking on buttons
+                if (e.target.closest('button')) return;
+                
+                selectTask(task.id);
+            });
+            
+            // Double click to edit task
+            div.addEventListener('dblclick', (e) => {
+                // Don't edit if clicking on buttons
+                if (e.target.closest('button')) return;
+                
+                openDrawer('edit', task.id);
+            });
+            
             return div;
         }
         
@@ -1784,6 +2122,74 @@
                     }
                 }
             });
+        }
+        
+        // Setup task reordering within a list
+        function setupTaskReordering(listElement, sectionName) {
+            if (!listElement) return;
+            
+            let draggedOverElement = null;
+            
+            listElement.addEventListener('dragover', (e) => {
+                if (draggedTask && !draggedCalendarTask && draggedTask.section === sectionName) {
+                    e.preventDefault();
+                    
+                    const afterElement = getDragAfterElement(listElement, e.clientY);
+                    const draggingElement = document.querySelector('.dragging');
+                    
+                    if (afterElement == null) {
+                        listElement.appendChild(draggingElement);
+                    } else {
+                        listElement.insertBefore(draggingElement, afterElement);
+                    }
+                }
+            });
+            
+            listElement.addEventListener('drop', (e) => {
+                e.preventDefault();
+                
+                if (draggedTask && draggedTask.section === sectionName) {
+                    // Get new order based on DOM
+                    const quadrantDiv = listElement.closest('[id^="thisweek-quadrant-"]');
+                    if (!quadrantDiv) return;
+                    
+                    const quadrantName = quadrantDiv.id.replace('thisweek-quadrant-', '');
+                    const taskElements = Array.from(listElement.children);
+                    const newOrder = taskElements.map(el => el.dataset.taskId);
+                    
+                    // Reorder tasks array based on new order
+                    const quadrantTasks = tasks.filter(t => t.section === sectionName && t.quadrant === quadrantName);
+                    const sortedTasks = [];
+                    
+                    newOrder.forEach(taskId => {
+                        const task = quadrantTasks.find(t => t.id === taskId);
+                        if (task) sortedTasks.push(task);
+                    });
+                    
+                    // Update order in tasks array
+                    const otherTasks = tasks.filter(t => !(t.section === sectionName && t.quadrant === quadrantName));
+                    tasks = [...otherTasks, ...sortedTasks];
+                    
+                    saveDataToSupabase();
+                    renderTasks();
+                    showToast('任务顺序已更新');
+                }
+            });
+        }
+        
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.task-card:not(.dragging)')];
+            
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
         }
         
         // Toggle task completion in calendar
@@ -2038,39 +2444,67 @@
                         });
                         
                         // Touch events for mobile drag support
-                        let touchStartX, touchStartY, isDragging = false, longPressTimeout;
+                        let touchStartX, touchStartY, isDragging = false, longPressTimeout, hasMovedDuringPress = false;
                         
                         taskEl.addEventListener('touchstart', (e) => {
                             touchStartX = e.touches[0].clientX;
                             touchStartY = e.touches[0].clientY;
                             isDragging = false;
+                            hasMovedDuringPress = false;
                             
-                            // Long press to initiate drag (500ms)
+                            // Long press detection (400ms) - will show context menu if not moved
                             longPressTimeout = setTimeout(() => {
-                                isDragging = true;
-                                draggedCalendarTask = ct;
-                                taskEl.style.opacity = '0.7';
-                                taskEl.style.transform = 'scale(1.05)';
-                                taskEl.style.zIndex = '100';
-                                // Provide haptic feedback if available
-                                if (navigator.vibrate) {
-                                    navigator.vibrate(50);
+                                if (!hasMovedDuringPress) {
+                                    // Show context menu
+                                    contextMenuTarget = ct;
+                                    showContextMenu(e.touches[0].clientX, e.touches[0].clientY);
+                                    if (navigator.vibrate) {
+                                        navigator.vibrate(50);
+                                    }
+                                } else {
+                                    // Start drag if moved
+                                    isDragging = true;
+                                    draggedCalendarTask = ct;
+                                    taskEl.style.opacity = '0.7';
+                                    taskEl.style.transform = 'scale(1.05)';
+                                    taskEl.style.zIndex = '100';
+                                    if (navigator.vibrate) {
+                                        navigator.vibrate(30);
+                                    }
                                 }
-                            }, 500);
+                            }, 400);
                         });
                         
                         taskEl.addEventListener('touchmove', (e) => {
-                            if (longPressTimeout) {
-                                clearTimeout(longPressTimeout);
+                            const touch = e.touches[0];
+                            const moveX = Math.abs(touch.clientX - touchStartX);
+                            const moveY = Math.abs(touch.clientY - touchStartY);
+                            
+                            // Detect if user has moved (threshold: 10px)
+                            if (moveX > 10 || moveY > 10) {
+                                hasMovedDuringPress = true;
                             }
                             
                             if (isDragging) {
                                 e.preventDefault();
-                                const touch = e.touches[0];
                                 taskEl.style.position = 'fixed';
                                 taskEl.style.left = touch.clientX - 50 + 'px';
                                 taskEl.style.top = touch.clientY - 15 + 'px';
                                 taskEl.style.pointerEvents = 'none';
+                                // Limit width on mobile
+                                const calendarColWidth = document.querySelector('.day-header')?.offsetWidth || 120;
+                                taskEl.style.maxWidth = calendarColWidth - 8 + 'px';
+                                taskEl.style.width = calendarColWidth - 8 + 'px';
+                            } else if (hasMovedDuringPress && longPressTimeout) {
+                                // User moved significantly, cancel context menu, prepare for drag
+                                clearTimeout(longPressTimeout);
+                                longPressTimeout = setTimeout(() => {
+                                    isDragging = true;
+                                    draggedCalendarTask = ct;
+                                    taskEl.style.opacity = '0.7';
+                                    taskEl.style.transform = 'scale(1.05)';
+                                    taskEl.style.zIndex = '100';
+                                }, 100);
                             }
                         });
                         
@@ -2115,6 +2549,8 @@
                                 taskEl.style.top = taskCount === 1 ? '2px' : `${2 + index * 30}px`;
                                 taskEl.style.zIndex = '';
                                 taskEl.style.pointerEvents = '';
+                                taskEl.style.maxWidth = '';
+                                taskEl.style.width = '';
                                 
                                 draggedCalendarTask = null;
                                 isDragging = false;
@@ -2135,6 +2571,8 @@
                                 taskEl.style.position = 'absolute';
                                 taskEl.style.zIndex = '';
                                 taskEl.style.pointerEvents = '';
+                                taskEl.style.maxWidth = '';
+                                taskEl.style.width = '';
                                 draggedCalendarTask = null;
                                 isDragging = false;
                                 renderCalendarTasks();
@@ -2174,10 +2612,201 @@
                             e.stopPropagation();
                         });
                         
+                        // Click to select calendar task and highlight parent task
+                        let clickTimer = null;
+                        let clickCount = 0;
+                        
+                        taskEl.addEventListener('click', (e) => {
+                            // Don't select if clicking on buttons
+                            if (e.target.closest('button')) return;
+                            
+                            clickCount++;
+                            
+                            if (clickCount === 1) {
+                                clickTimer = setTimeout(() => {
+                                    // Single click - select task
+                                    selectTaskFromCalendar(ct.taskId);
+                                    clickCount = 0;
+                                }, 300);
+                            } else if (clickCount === 2) {
+                                // Double click - edit task
+                                clearTimeout(clickTimer);
+                                clickCount = 0;
+                                const task = tasks.find(t => t.id === ct.taskId);
+                                if (task) {
+                                    openDrawer('edit', task.id);
+                                }
+                            }
+                        });
+                        
+                        // Mobile double tap support
+                        let lastTouchTime = 0;
+                        taskEl.addEventListener('touchend', (e) => {
+                            const currentTime = new Date().getTime();
+                            const tapLength = currentTime - lastTouchTime;
+                            
+                            if (tapLength < 300 && tapLength > 0) {
+                                // Double tap detected
+                                e.preventDefault();
+                                const task = tasks.find(t => t.id === ct.taskId);
+                                if (task) {
+                                    openDrawer('edit', task.id);
+                                }
+                            }
+                            
+                            lastTouchTime = currentTime;
+                        });
+                        
                         block.appendChild(taskEl);
                     });
                 }
             });
+        }
+        
+        // Select task and highlight it
+        function selectTask(taskId) {
+            selectedTaskId = taskId;
+            updateTaskSelection();
+        }
+        
+        // Select task from calendar and scroll to parent task in sidebar
+        function selectTaskFromCalendar(taskId) {
+            selectedTaskId = taskId;
+            
+            // Find the task element in sidebar
+            const taskElement = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+            if (taskElement) {
+                // Scroll to task
+                taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Expand the section if it's collapsed
+                const task = tasks.find(t => t.id === taskId);
+                if (task) {
+                    const sectionId = task.section;
+                    const sectionContent = document.getElementById(`${sectionId}Content`);
+                    if (sectionContent && sectionContent.classList.contains('hidden')) {
+                        toggleSection(sectionId);
+                    }
+                }
+            }
+            
+            updateTaskSelection();
+        }
+        
+        // Update visual selection state
+        function updateTaskSelection() {
+            // Remove all previous selections
+            document.querySelectorAll('.task-selected').forEach(el => {
+                el.classList.remove('task-selected');
+            });
+            
+            if (!selectedTaskId) return;
+            
+            // Highlight task in sidebar
+            const sidebarTask = document.querySelector(`.task-card[data-task-id="${selectedTaskId}"]`);
+            if (sidebarTask) {
+                sidebarTask.classList.add('task-selected');
+            }
+            
+            // Highlight all calendar instances
+            const calendarInstances = calendarTasks.filter(ct => ct.taskId === selectedTaskId);
+            calendarInstances.forEach(ct => {
+                const calendarElement = document.querySelector(`.calendar-task[title="${ct.name}"]`);
+                if (calendarElement) {
+                    calendarElement.classList.add('task-selected');
+                }
+            });
+        }
+        
+        // Clear selection when clicking on empty space
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.task-card') && !e.target.closest('.calendar-task')) {
+                selectedTaskId = null;
+                updateTaskSelection();
+            }
+            
+            // Hide context menu
+            if (!e.target.closest('.context-menu')) {
+                hideContextMenu();
+            }
+        });
+        
+        // Disable context menu on calendar tasks (mobile)
+        document.addEventListener('contextmenu', (e) => {
+            if (e.target.closest('.calendar-task') || e.target.closest('.calendar-block')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+        
+        // Context menu functions
+        function showContextMenu(x, y) {
+            const menu = document.getElementById('contextMenu');
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+            menu.classList.add('show');
+        }
+        
+        function hideContextMenu() {
+            const menu = document.getElementById('contextMenu');
+            menu.classList.remove('show');
+            contextMenuTarget = null;
+        }
+        
+        function contextMenuEdit() {
+            if (contextMenuTarget) {
+                const task = tasks.find(t => t.id === contextMenuTarget.taskId);
+                if (task) {
+                    openDrawer('edit', task.id);
+                }
+            }
+            hideContextMenu();
+        }
+        
+        function contextMenuDelete() {
+            if (contextMenuTarget) {
+                calendarTasks = calendarTasks.filter(t => t.id !== contextMenuTarget.id);
+                // Reorder remaining tasks in this cell
+                const remaining = calendarTasks.filter(t => 
+                    t.day === contextMenuTarget.day && t.hour === contextMenuTarget.hour
+                );
+                remaining.forEach((t, i) => t.position = i);
+                saveDataToSupabase();
+                renderCalendarTasks();
+                renderTasks();
+                showToast('已从日历移除');
+            }
+            hideContextMenu();
+        }
+        
+        // Update add button styles based on whether section has tasks
+        function updateAddButtonStyles(section, taskCount) {
+            const btn = document.getElementById(`${section}AddBtn`);
+            const btnText = document.getElementById(`${section}AddBtnText`);
+            
+            if (!btn || !btnText) return;
+            
+            if (taskCount === 0) {
+                // No tasks: Black background primary button
+                btn.className = 'flex items-center gap-1 px-3 py-1.5 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 transition-colors';
+                btnText.classList.remove('hidden');
+            } else {
+                // Has tasks: Blue text button
+                btn.className = 'flex items-center gap-1 text-blue-600 text-sm font-medium hover:text-blue-700 transition-colors';
+                btnText.classList.add('hidden');
+            }
+        }
+        
+        // Update clear status button visibility
+        function updateClearStatusButton(finishedCount) {
+            const btn = document.getElementById('clearStatusBtn');
+            if (!btn) return;
+            
+            if (finishedCount > 0) {
+                btn.classList.remove('hidden');
+            } else {
+                btn.classList.add('hidden');
+            }
         }
         
         // Storage
@@ -2215,7 +2844,7 @@
             const toast = document.getElementById('toast');
             toast.innerHTML = `
                 <span>${message}</span>
-                <button onclick="undoTaskMove()" class="ml-4 px-3 py-1 bg-white text-gray-900 rounded hover:bg-gray-100 transition-colors text-sm font-medium">
+                <button onclick="undoTaskMove()" class="px-3 py-1 bg-white text-gray-900 rounded hover:bg-gray-100 transition-colors text-sm font-medium">
                     撤销
                 </button>
             `;
@@ -2255,7 +2884,7 @@
             const toast = document.getElementById('toast');
             toast.innerHTML = `
                 <span>${message}</span>
-                <button onclick="undoTaskDelete()" class="ml-4 px-3 py-1 bg-white text-gray-900 rounded hover:bg-gray-100 transition-colors text-sm font-medium">
+                <button onclick="undoTaskDelete()" class="px-3 py-1 bg-white text-gray-900 rounded hover:bg-gray-100 transition-colors text-sm font-medium">
                     撤销
                 </button>
             `;
