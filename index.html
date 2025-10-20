@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.4.2">
+    <meta name="version" content="1.4.3">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -971,9 +971,9 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.4.2 Loaded - Bug Fixes');
-        console.log('✅ 修复：日历视图添加任务后保存没反应（缺少duration字段）');
-        console.log('✅ 修复：侧边栏蒙层z-index问题，现在能正确覆盖所有内容');
+        console.log('Week Plan App - Version 1.4.3 Loaded - UI Polish');
+        console.log('✅ 优化：时间列（7 AM等）改为右对齐');
+        console.log('✅ 修复：日历添加任务和蒙层z-index问题');
         console.log('✅ 双击编辑：列表和日历视图统一');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
@@ -1656,7 +1656,7 @@
             hours.forEach((hour, hourIndex) => {
                 html += `
                     <div class="flex">
-                        <div class="w-16 flex-shrink-0 text-xs font-medium text-zinc-500 leading-4 pl-2 flex items-start pt-1">${hour}</div>
+                        <div class="w-16 flex-shrink-0 text-xs font-medium text-zinc-500 leading-4 pr-2 flex items-start pt-1 text-right">${hour}</div>
                         <div class="flex flex-1">
                 `;
                 
