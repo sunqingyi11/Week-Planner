@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.3.0">
+    <meta name="version" content="1.3.2">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -959,8 +959,10 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.3.0 Loaded - Interactive Task Resizing & Reordering');
-        console.log('✅ 清空已完成状态按钮样式更新：灰色描边+图标');
+        console.log('Week Plan App - Version 1.3.2 Loaded - OAuth Redirect Fix');
+        console.log('✅ 默认时长：60分钟（1小时）');
+        console.log('✅ 单个任务：可调整30/60分钟 | 两个任务：自动平分单元格');
+        console.log('✅ 修复：Redirect URL 路径处理（移除 index.html）');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -1124,21 +1126,71 @@
             }
             
             try {
-                // 明确指定重定向URL
-                const redirectUrl = 'https://sunqingyi11.github.io/Week-Planner'
+                // 动态获取当前URL作为redirect URL（支持本地和部署环境）
+                let redirectUrl = window.location.origin + window.location.pathname
+                
+                // 移除 index.html 或其他文件名，只保留目录路径
+                if (redirectUrl.endsWith('.html')) {
+                    redirectUrl = redirectUrl.substring(0, redirectUrl.lastIndexOf('/') + 1)
+                }
+                
+                // 如果不是以 / 结尾，添加 /
+                if (!redirectUrl.endsWith('/')) {
+                    redirectUrl += '/'
+                }
+                
+                console.log('🔐 Google登录 - Current URL:', window.location.href)
+                console.log('🔐 Google登录 - Redirect URL:', redirectUrl)
+                console.log('📋 请确保以上 Redirect URL 已在 Supabase Dashboard 中配置！')
+                console.log('📖 配置指南：查看 SUPABASE_REDIRECT_CONFIG.md 或 OAUTH_DEBUG.md')
+                
+                // 验证 Redirect URL 格式
+                if (!redirectUrl.endsWith('/')) {
+                    console.warn('⚠️ Redirect URL 应该以 / 结尾，已自动修正')
+                }
                 
                 const { data, error } = await supabase.auth.signInWithOAuth({
                     provider: 'google',
                     options: {
-                        redirectTo: redirectUrl
+                        redirectTo: redirectUrl,
+                        // 移动端优化：使用popup模式（如果支持）
+                        skipBrowserRedirect: false,
+                        // 添加查询参数以便识别OAuth回调
+                        queryParams: {
+                            access_type: 'offline',
+                            prompt: 'consent'
+                        }
                     }
                 })
                 
                 if (error) throw error
+                
+                console.log('✅ Google OAuth initiated')
                 // OAuth will redirect, no need to handle response here
             } catch (error) {
-                console.error('Google sign in error:', error)
-                alert('Google 登录失败: ' + error.message)
+                console.error('❌ Google sign in error:', error)
+                console.error('Error details:', {
+                    message: error.message,
+                    status: error.status,
+                    name: error.name
+                })
+                
+                // 更友好的错误提示
+                let errorMessage = 'Google 登录失败'
+                let helpMessage = '\n\n请检查：\n1. 控制台中的 Redirect URL\n2. Supabase 配置是否包含该 URL\n3. 查看 OAUTH_DEBUG.md 获取详细帮助'
+                
+                if (error.message.includes('redirect') || error.message.includes('终止') || error.message.includes('连接')) {
+                    errorMessage = '❌ 登录重定向失败\n\n可能原因：\n• Supabase 中未配置 Redirect URL\n• 网络连接问题'
+                    helpMessage = `\n\n✅ 请在 Supabase 中添加：\n${redirectUrl}\n\n📖 查看 OAUTH_DEBUG.md 获取详细步骤`
+                } else if (error.message.includes('popup')) {
+                    errorMessage = '❌ 弹窗被阻止\n\n请允许浏览器弹窗以完成登录'
+                    helpMessage = ''
+                } else if (error.message) {
+                    errorMessage = `Google 登录失败\n\n错误信息：${error.message}`
+                }
+                
+                alert(errorMessage + helpMessage)
+                console.error('💡 解决方案：查看 OAUTH_DEBUG.md 文件获取详细的诊断和修复步骤')
             }
         }
         
@@ -1245,7 +1297,7 @@
                     tasks = data.tasks || []
                     calendarTasks = (data.calendar_tasks || []).map(ct => ({
                         ...ct,
-                        duration: ct.duration || 30 // Ensure all tasks have duration
+                        duration: ct.duration || 60 // Ensure all tasks have duration (default 60 min)
                     }))
                     console.log('✅ 从Supabase加载数据:', {
                         tasks: tasks.length,
@@ -1367,13 +1419,24 @@
         // Listen for auth state changes
         if (supabase) {
             supabase.auth.onAuthStateChange((event, session) => {
-                console.log('Auth state changed:', event)
+                console.log('🔔 Auth state changed:', event)
+                console.log('Session:', session ? 'Active' : 'None')
+                console.log('User:', session?.user?.email || 'None')
+                
                 if (event === 'SIGNED_IN' && session?.user) {
                     currentUser = session.user
+                    console.log('✅ User signed in:', currentUser.email)
                     updateUIForLoggedIn(session.user)
                     loadDataFromSupabase()
                     setupRealtimeSubscription()
+                    
+                    // 移除URL中的OAuth参数（清理URL）
+                    if (window.location.hash) {
+                        console.log('🧹 Cleaning OAuth hash from URL')
+                        window.history.replaceState({}, document.title, window.location.pathname)
+                    }
                 } else if (event === 'SIGNED_OUT') {
+                    console.log('👋 User signed out')
                     // Cleanup real-time subscription
                     if (realtimeChannel) {
                         supabase.removeChannel(realtimeChannel);
@@ -1381,6 +1444,28 @@
                     }
                     currentUser = null
                     updateUIForLoggedOut()
+                } else if (event === 'TOKEN_REFRESHED') {
+                    console.log('🔄 Token refreshed')
+                } else if (event === 'USER_UPDATED') {
+                    console.log('👤 User updated')
+                }
+            })
+            
+            // 检查初始会话（处理OAuth回调）
+            supabase.auth.getSession().then(({ data: { session }, error }) => {
+                if (error) {
+                    console.error('❌ Error getting session:', error)
+                    return
+                }
+                
+                if (session?.user) {
+                    console.log('✅ Initial session found:', session.user.email)
+                    currentUser = session.user
+                    updateUIForLoggedIn(session.user)
+                    loadDataFromSupabase()
+                    setupRealtimeSubscription()
+                } else {
+                    console.log('ℹ️ No initial session')
                 }
             })
         }
@@ -2365,7 +2450,7 @@
                     day,
                     hour,
                     position: tasksInCell.length, // 0 for first, 1 for second
-                    duration: 30 // Duration in minutes (30 or 60)
+                    duration: 60 // Duration in minutes (default 60 = 1 hour)
                 };
                 
                 calendarTasks.push(calendarTask);
@@ -2424,13 +2509,21 @@
                     tasks.sort((a, b) => (a.position || 0) - (b.position || 0));
                     
                     const taskCount = tasks.length;
-                    const taskHeight = taskCount === 1 ? '56px' : '28px'; // 60px cell - 4px padding
                     
                     tasks.forEach((ct, index) => {
                         const taskEl = document.createElement('div');
                         const completedClass = ct.completed ? 'completed' : '';
-                        const duration = ct.duration || 30; // Default 30 minutes
-                        const heightPx = duration === 60 ? '56px' : '28px'; // 60 or 30 minutes
+                        const duration = ct.duration || 60; // Default 60 minutes (1 hour)
+                        
+                        // Height logic: 
+                        // - If single task: use its duration (60min=56px, 30min=28px)
+                        // - If two tasks: force 28px each (split the cell)
+                        let heightPx;
+                        if (taskCount === 1) {
+                            heightPx = duration === 60 ? '56px' : '28px';
+                        } else {
+                            heightPx = '28px'; // Force half height when 2 tasks
+                        }
                         
                         taskEl.className = `calendar-task bg-white border border-slate-200 rounded flex items-center gap-1 shadow-sm hover:shadow-md transition-all ${completedClass}`;
                         taskEl.draggable = true;
@@ -2456,6 +2549,10 @@
                             </svg>
                         `;
                         
+                        // Resize handle - only show when single task in cell
+                        const resizeHandleHtml = taskCount === 1 ? 
+                            `<div class="resize-handle" style="position: absolute; bottom: 0; left: 0; right: 0; height: 4px; cursor: ns-resize; background: transparent;" title="拖拽调整时长"></div>` : '';
+                        
                         taskEl.innerHTML = `
                             <div class="${colorMap[ct.color]} h-full w-1 flex-shrink-0 rounded-l"></div>
                             <div class="flex items-center justify-center flex-shrink-0 drag-handle" style="width: 16px; height: 16px; padding: 0 4px; cursor: grab;">
@@ -2477,7 +2574,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
-                            <div class="resize-handle" style="position: absolute; bottom: 0; left: 0; right: 0; height: 4px; cursor: ns-resize; background: transparent;" title="拖拽调整时长"></div>
+                            ${resizeHandleHtml}
                         `;
                         
                         // Drag events for calendar tasks
@@ -2706,61 +2803,65 @@
                             lastTouchTime = currentTime;
                         });
                         
-                        // Resize handle event listeners
-                        const resizeHandle = taskEl.querySelector('.resize-handle');
-                        let isResizing = false;
-                        let resizeStartY = 0;
-                        let originalDuration = 0;
-                        
-                        resizeHandle.addEventListener('mousedown', (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            isResizing = true;
-                            resizeStartY = e.clientY;
-                            originalDuration = ct.duration || 30;
-                            taskEl.draggable = false; // Disable dragging while resizing
-                            taskEl.style.cursor = 'ns-resize';
-                            resizeHandle.style.background = 'rgba(59, 130, 246, 0.3)'; // Blue highlight
-                        });
-                        
-                        document.addEventListener('mousemove', (e) => {
-                            if (!isResizing) return;
-                            e.preventDefault();
-                            
-                            const deltaY = e.clientY - resizeStartY;
-                            // Each 30px = 30 minutes (half hour)
-                            const newDuration = deltaY > 15 ? 60 : 30;
-                            
-                            // Update visual height
-                            taskEl.style.height = newDuration === 60 ? '56px' : '28px';
-                        });
-                        
-                        document.addEventListener('mouseup', (e) => {
-                            if (!isResizing) return;
-                            
-                            const deltaY = e.clientY - resizeStartY;
-                            const newDuration = deltaY > 15 ? 60 : 30;
-                            
-                            // Update task duration
-                            ct.duration = newDuration;
-                            
-                            // Save and re-render
-                            saveDataToSupabase();
-                            renderCalendarTasks();
-                            
-                            isResizing = false;
-                            taskEl.draggable = true;
-                            taskEl.style.cursor = 'move';
-                            resizeHandle.style.background = 'transparent';
-                            
-                            showToast(newDuration === 60 ? '已调整为1小时' : '已调整为30分钟');
-                        });
-                        
-                        // Prevent drag when interacting with resize handle
-                        resizeHandle.addEventListener('dragstart', (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                        });
+                        // Resize handle event listeners - only for single task
+                        if (taskCount === 1) {
+                            const resizeHandle = taskEl.querySelector('.resize-handle');
+                            if (resizeHandle) {
+                                let isResizing = false;
+                                let resizeStartY = 0;
+                                let originalDuration = 0;
+                                
+                                resizeHandle.addEventListener('mousedown', (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    isResizing = true;
+                                    resizeStartY = e.clientY;
+                                    originalDuration = ct.duration || 60;
+                                    taskEl.draggable = false; // Disable dragging while resizing
+                                    taskEl.style.cursor = 'ns-resize';
+                                    resizeHandle.style.background = 'rgba(59, 130, 246, 0.3)'; // Blue highlight
+                                });
+                                
+                                document.addEventListener('mousemove', (e) => {
+                                    if (!isResizing) return;
+                                    e.preventDefault();
+                                    
+                                    const deltaY = e.clientY - resizeStartY;
+                                    // Each 30px = 30 minutes (half hour)
+                                    const newDuration = deltaY > 15 ? 60 : 30;
+                                    
+                                    // Update visual height
+                                    taskEl.style.height = newDuration === 60 ? '56px' : '28px';
+                                });
+                                
+                                document.addEventListener('mouseup', (e) => {
+                                    if (!isResizing) return;
+                                    
+                                    const deltaY = e.clientY - resizeStartY;
+                                    const newDuration = deltaY > 15 ? 60 : 30;
+                                    
+                                    // Update task duration
+                                    ct.duration = newDuration;
+                                    
+                                    // Save and re-render
+                                    saveDataToSupabase();
+                                    renderCalendarTasks();
+                                    
+                                    isResizing = false;
+                                    taskEl.draggable = true;
+                                    taskEl.style.cursor = 'move';
+                                    resizeHandle.style.background = 'transparent';
+                                    
+                                    showToast(newDuration === 60 ? '已调整为1小时' : '已调整为30分钟');
+                                });
+                                
+                                // Prevent drag when interacting with resize handle
+                                resizeHandle.addEventListener('dragstart', (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                });
+                            }
+                        }
                         
                         // Enhanced drag handle for reordering within same cell
                         const dragHandle = taskEl.querySelector('.drag-handle');
@@ -3008,7 +3109,7 @@
             if (storedCalendarTasks) {
                 calendarTasks = JSON.parse(storedCalendarTasks).map(ct => ({
                     ...ct,
-                    duration: ct.duration || 30 // Ensure all tasks have duration
+                    duration: ct.duration || 60 // Ensure all tasks have duration (default 60 min)
                 }));
             }
         }
