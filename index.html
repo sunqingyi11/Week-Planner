@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.4.7">
+    <meta name="version" content="1.4.8">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -466,6 +466,7 @@
                             id="taskName" 
                             placeholder="请输入" 
                             required
+                            autocomplete="off"
                             class="border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
                         />
                     </div>
@@ -956,10 +957,8 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.4.7 Loaded - Timeline & Padding Polish');
-        console.log('✅ 优化：时间列左右padding均为8px');
-        console.log('✅ 优化：current timeline红色圆头与分割线左对齐');
-        console.log('✅ 优化：current timeline只显示在当天这一列');
+        console.log('Week Plan App - Version 1.4.8 Loaded - Final Polish');
+        console.log('✅ 优化：禁用任务名称输入框的浏览器自动建议');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
