@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.4.8">
+    <meta name="version" content="1.5.0">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -957,7 +957,8 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.4.8 Loaded - Final Polish');
+        console.log('Week Plan App - Version 1.5.0 Loaded - Auto-save Feature');
+        console.log('✅ 新功能：关闭弹窗时自动保存任务（无需点击保存按钮）');
         console.log('✅ 优化：禁用任务名称输入框的浏览器自动建议');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
@@ -1549,80 +1550,27 @@
                 e.preventDefault();
                 console.log('📝 表单提交开始...');
                 
-                const taskId = document.getElementById('taskId').value;
                 const name = document.getElementById('taskName').value.trim();
-                const quadrant = document.getElementById('taskQuadrant').value;
-                const color = document.getElementById('taskColor').value;
-                const form = document.getElementById('taskForm');
-                
-                console.log('表单数据:', { taskId, name, quadrant, color, pendingCalendarPosition });
                 
                 if (!name) {
                     showToast('请输入任务名称');
                     return;
                 }
                 
-                if (taskId) {
-                    // Edit existing task
-                    const task = tasks.find(t => t.id === taskId);
-                    if (task) {
-                        const oldQuadrant = task.quadrant;
-                        task.name = name;
-                        task.quadrant = quadrant;
-                        task.color = color;
-                        
-                        // Update all calendar instances
-                        calendarTasks.forEach(ct => {
-                            if (ct.taskId === taskId) {
-                                ct.name = name;
-                                ct.color = color;
-                            }
-                        });
-                    }
-                } else {
-                    // Create new task
-                    const newTaskId = Date.now().toString();
-                    const targetSection = form.dataset.targetSection || (pendingCalendarPosition ? 'thisweek' : 'planning');
-                    const newTask = {
-                        id: newTaskId,
-                        name,
-                        quadrant,
-                        color,
-                        section: targetSection
-                    };
-                    tasks.push(newTask);
-                    
-                    // If created from calendar, automatically add to calendar at that position
-                    if (pendingCalendarPosition) {
-                        console.log('✅ 从日历创建，添加到日历位置:', pendingCalendarPosition);
-                        const calendarTask = {
-                            id: Date.now().toString() + '_cal',
-                            taskId: newTaskId,
-                            name: name,
-                            color: color,
-                            day: pendingCalendarPosition.day,
-                            hour: pendingCalendarPosition.hour,
-                            position: pendingCalendarPosition.position,
-                            duration: 60 // Default 60 minutes (1 hour)
-                        };
-                        calendarTasks.push(calendarTask);
-                        console.log('📅 日历任务已添加:', calendarTask);
-                        console.log('📊 当前所有日历任务:', calendarTasks.length);
-                        pendingCalendarPosition = null; // Reset
-                    } else {
-                        console.log('⚠️ 不是从日历创建的任务');
-                    }
-                }
+                // Use the shared save function
+                const taskId = document.getElementById('taskId').value;
+                saveTaskFromDrawer(true);
                 
-                console.log('💾 保存数据...');
-                saveDataToSupabase();
-                console.log('🎨 渲染任务列表...');
-                renderTasks();
-                console.log('📅 渲染日历任务...');
-                renderCalendarTasks();
+                // Clear pending calendar position
+                pendingCalendarPosition = null;
+                
                 console.log('❌ 关闭弹窗...');
-                closeDrawer();
-                showToast(taskId ? '任务已更新' : '任务已创建');
+                const drawer = document.getElementById('drawer');
+                const backdrop = document.getElementById('drawerBackdrop');
+                drawer.classList.remove('drawer-open');
+                drawer.classList.add('drawer-closed');
+                backdrop.classList.add('hidden');
+                
                 console.log('✅ 表单提交完成！');
             });
         });
@@ -1914,15 +1862,93 @@
             }, 100);
         }
         
+        // Auto-save task when closing drawer
+        function saveTaskFromDrawer(showToastMessage = false) {
+            const taskId = document.getElementById('taskId').value;
+            const name = document.getElementById('taskName').value.trim();
+            const quadrant = document.getElementById('taskQuadrant').value;
+            const color = document.getElementById('taskColor').value;
+            const form = document.getElementById('taskForm');
+            
+            // Only save if there's a name
+            if (!name) {
+                return false;
+            }
+            
+            if (taskId) {
+                // Edit existing task
+                const task = tasks.find(t => t.id === taskId);
+                if (task) {
+                    task.name = name;
+                    task.quadrant = quadrant;
+                    task.color = color;
+                    
+                    // Update all calendar instances
+                    calendarTasks.forEach(ct => {
+                        if (ct.taskId === taskId) {
+                            ct.name = name;
+                            ct.color = color;
+                        }
+                    });
+                }
+            } else {
+                // Create new task
+                const newTaskId = Date.now().toString();
+                const targetSection = form.dataset.targetSection || (pendingCalendarPosition ? 'thisweek' : 'planning');
+                const newTask = {
+                    id: newTaskId,
+                    name,
+                    quadrant,
+                    color,
+                    section: targetSection
+                };
+                tasks.push(newTask);
+                
+                // If created from calendar, automatically add to calendar at that position
+                if (pendingCalendarPosition) {
+                    const calendarTask = {
+                        id: Date.now().toString() + '_cal',
+                        taskId: newTaskId,
+                        name: name,
+                        color: color,
+                        day: pendingCalendarPosition.day,
+                        hour: pendingCalendarPosition.hour,
+                        position: pendingCalendarPosition.position,
+                        duration: 60 // Default 60 minutes (1 hour)
+                    };
+                    calendarTasks.push(calendarTask);
+                }
+            }
+            
+            saveDataToSupabase();
+            renderTasks();
+            renderCalendarTasks();
+            
+            if (showToastMessage) {
+                showToast(taskId ? '任务已更新' : '任务已创建');
+            }
+            
+            return true;
+        }
+        
         function closeDrawer() {
+            // Auto-save before closing
+            const wasSaved = saveTaskFromDrawer(false);
+            
             const drawer = document.getElementById('drawer');
             const backdrop = document.getElementById('drawerBackdrop');
             drawer.classList.remove('drawer-open');
             drawer.classList.add('drawer-closed');
             backdrop.classList.add('hidden');
             
-            // Clear pending calendar position if drawer is closed without saving
+            // Clear pending calendar position
             pendingCalendarPosition = null;
+            
+            // Show toast if task was auto-saved
+            if (wasSaved) {
+                const taskId = document.getElementById('taskId').value;
+                showToast(taskId ? '任务已自动保存' : '任务已自动创建');
+            }
         }
         
         function selectColor(color) {
