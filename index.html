@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.4.1">
+    <meta name="version" content="1.4.2">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -88,11 +88,11 @@
             
             /* Ensure drawer appears above sidebar on mobile */
             .drawer {
-                z-index: 60 !important;
+                z-index: 10000 !important;
             }
             
             #drawerBackdrop {
-                z-index: 55 !important;
+                z-index: 9999 !important;
             }
         }
         
@@ -450,7 +450,7 @@
     </div>
     
     <!-- Backdrop Overlay -->
-    <div id="drawerBackdrop" class="fixed inset-0 bg-black bg-opacity-30 z-40 hidden transition-opacity" onclick="closeDrawer()" style="z-index: 45;"></div>
+    <div id="drawerBackdrop" class="fixed inset-0 bg-black bg-opacity-30 hidden transition-opacity" onclick="closeDrawer()"></div>
     
     <!-- Main Container -->
     <div class="flex h-screen">
@@ -971,10 +971,10 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.4.1 Loaded - Double Click Edit + Icon Update');
-        console.log('✅ 双击编辑：列表和日历视图，桌面和移动端统一');
-        console.log('✅ 时长调整：30分钟递增，最长240分钟（4小时）');
-        console.log('✅ 新图标：灰色虚线圆形check mark');
+        console.log('Week Plan App - Version 1.4.2 Loaded - Bug Fixes');
+        console.log('✅ 修复：日历视图添加任务后保存没反应（缺少duration字段）');
+        console.log('✅ 修复：侧边栏蒙层z-index问题，现在能正确覆盖所有内容');
+        console.log('✅ 双击编辑：列表和日历视图统一');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -1882,7 +1882,8 @@
                         color: color,
                         day: pendingCalendarPosition.day,
                         hour: pendingCalendarPosition.hour,
-                        position: pendingCalendarPosition.position
+                        position: pendingCalendarPosition.position,
+                        duration: 60 // Default 60 minutes (1 hour)
                     };
                     calendarTasks.push(calendarTask);
                     pendingCalendarPosition = null; // Reset
