@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.3.2">
+    <meta name="version" content="1.4.1">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -52,6 +52,8 @@
         .calendar-block {
             min-height: 40px;
             position: relative;
+            /* Allow overflow for long-duration tasks */
+            overflow: visible;
         }
         
         /* Sidebar toggle in header */
@@ -203,6 +205,13 @@
             width: calc(100% - 4px);
             left: 2px;
             z-index: 10;
+            /* Allow tasks to overflow cell boundaries for long durations */
+            overflow: visible;
+        }
+        
+        /* Higher z-index when resizing to show above other elements */
+        .calendar-task.resizing {
+            z-index: 100;
         }
         
         .calendar-task .close-button,
@@ -709,8 +718,11 @@
                     </div>
                     <!-- Clear Completed Status Button in Calendar Header -->
                     <button id="clearStatusBtnCalendar" onclick="showClearStatusConfirmation()" class="bg-white border border-slate-300 flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium text-gray-800 hover:bg-slate-50 transition-colors hidden" title="清空已完成状态">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7M5 13l4-4" />
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24">
+                            <!-- 灰色虚线圆形 -->
+                            <circle cx="12" cy="12" r="9" stroke="#9CA3AF" stroke-width="2" stroke-dasharray="2,2" fill="none"/>
+                            <!-- 灰色check mark -->
+                            <path d="M8 12.5l2.5 2.5L16 9" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
                         </svg>
                         清空已完成状态
                     </button>
@@ -959,10 +971,10 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.3.2 Loaded - OAuth Redirect Fix');
-        console.log('✅ 默认时长：60分钟（1小时）');
-        console.log('✅ 单个任务：可调整30/60分钟 | 两个任务：自动平分单元格');
-        console.log('✅ 修复：Redirect URL 路径处理（移除 index.html）');
+        console.log('Week Plan App - Version 1.4.1 Loaded - Double Click Edit + Icon Update');
+        console.log('✅ 双击编辑：列表和日历视图，桌面和移动端统一');
+        console.log('✅ 时长调整：30分钟递增，最长240分钟（4小时）');
+        console.log('✅ 新图标：灰色虚线圆形check mark');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -2086,20 +2098,52 @@
                 });
             });
             
-            // Click to select task
+            // Click and Double click handlers (unified)
+            let clickCount = 0;
+            let clickTimer = null;
+            
             div.addEventListener('click', (e) => {
-                // Don't select if clicking on buttons
+                // Don't handle if clicking on buttons
                 if (e.target.closest('button')) return;
                 
-                selectTask(task.id);
+                clickCount++;
+                
+                if (clickCount === 1) {
+                    // Wait to see if it's a double click
+                    clickTimer = setTimeout(() => {
+                        // Single click - select task
+                        selectTask(task.id);
+                        clickCount = 0;
+                    }, 300);
+                } else if (clickCount === 2) {
+                    // Double click - edit task
+                    clearTimeout(clickTimer);
+                    clickCount = 0;
+                    openDrawer('edit', task.id);
+                }
             });
             
-            // Double click to edit task
-            div.addEventListener('dblclick', (e) => {
-                // Don't edit if clicking on buttons
+            // Mobile touch support for double tap
+            let lastTouchTime = 0;
+            div.addEventListener('touchend', (e) => {
+                // Don't handle if touching buttons
                 if (e.target.closest('button')) return;
                 
-                openDrawer('edit', task.id);
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTouchTime;
+                
+                if (tapLength < 400 && tapLength > 0) {
+                    // Double tap detected - edit task
+                    e.preventDefault();
+                    openDrawer('edit', task.id);
+                } else {
+                    // Single tap - select task
+                    setTimeout(() => {
+                        selectTask(task.id);
+                    }, 400);
+                }
+                
+                lastTouchTime = currentTime;
             });
             
             return div;
@@ -2180,20 +2224,52 @@
                 });
             });
             
-            // Click to select task
+            // Click and Double click handlers (unified)
+            let clickCount = 0;
+            let clickTimer = null;
+            
             div.addEventListener('click', (e) => {
-                // Don't select if clicking on buttons
+                // Don't handle if clicking on buttons
                 if (e.target.closest('button')) return;
                 
-                selectTask(task.id);
+                clickCount++;
+                
+                if (clickCount === 1) {
+                    // Wait to see if it's a double click
+                    clickTimer = setTimeout(() => {
+                        // Single click - select task
+                        selectTask(task.id);
+                        clickCount = 0;
+                    }, 300);
+                } else if (clickCount === 2) {
+                    // Double click - edit task
+                    clearTimeout(clickTimer);
+                    clickCount = 0;
+                    openDrawer('edit', task.id);
+                }
             });
             
-            // Double click to edit task
-            div.addEventListener('dblclick', (e) => {
-                // Don't edit if clicking on buttons
+            // Mobile touch support for double tap
+            let lastTouchTime = 0;
+            div.addEventListener('touchend', (e) => {
+                // Don't handle if touching buttons
                 if (e.target.closest('button')) return;
                 
-                openDrawer('edit', task.id);
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTouchTime;
+                
+                if (tapLength < 400 && tapLength > 0) {
+                    // Double tap detected - edit task
+                    e.preventDefault();
+                    openDrawer('edit', task.id);
+                } else {
+                    // Single tap - select task
+                    setTimeout(() => {
+                        selectTask(task.id);
+                    }, 400);
+                }
+                
+                lastTouchTime = currentTime;
             });
             
             return div;
@@ -2516,11 +2592,13 @@
                         const duration = ct.duration || 60; // Default 60 minutes (1 hour)
                         
                         // Height logic: 
-                        // - If single task: use its duration (60min=56px, 30min=28px)
+                        // - If single task: use its duration (30min=28px, 60min=56px, 90min=84px, etc.)
                         // - If two tasks: force 28px each (split the cell)
                         let heightPx;
                         if (taskCount === 1) {
-                            heightPx = duration === 60 ? '56px' : '28px';
+                            // Calculate height based on duration: 28px per 30 minutes
+                            const halfHours = Math.ceil(duration / 30);
+                            heightPx = (halfHours * 28) + 'px';
                         } else {
                             heightPx = '28px'; // Force half height when 2 tasks
                         }
@@ -2758,19 +2836,20 @@
                             e.stopPropagation();
                         });
                         
-                        // Click to select calendar task and highlight parent task
+                        // Click and Double click handlers for calendar tasks (unified)
                         let clickTimer = null;
                         let clickCount = 0;
                         
                         taskEl.addEventListener('click', (e) => {
-                            // Don't select if clicking on buttons
-                            if (e.target.closest('button')) return;
+                            // Don't handle if clicking on buttons or resize handle
+                            if (e.target.closest('button') || e.target.closest('.resize-handle')) return;
                             
                             clickCount++;
                             
                             if (clickCount === 1) {
+                                // Wait to see if it's a double click
                                 clickTimer = setTimeout(() => {
-                                    // Single click - select task
+                                    // Single click - select task and highlight parent
                                     selectTaskFromCalendar(ct.taskId);
                                     clickCount = 0;
                                 }, 300);
@@ -2785,19 +2864,29 @@
                             }
                         });
                         
-                        // Mobile double tap support
+                        // Mobile touch support for double tap
                         let lastTouchTime = 0;
                         taskEl.addEventListener('touchend', (e) => {
+                            // Don't handle if touching buttons or resize handle
+                            if (e.target.closest('button') || e.target.closest('.resize-handle')) return;
+                            
                             const currentTime = new Date().getTime();
                             const tapLength = currentTime - lastTouchTime;
                             
-                            if (tapLength < 300 && tapLength > 0) {
-                                // Double tap detected
+                            if (tapLength < 400 && tapLength > 0) {
+                                // Double tap detected - edit task
                                 e.preventDefault();
                                 const task = tasks.find(t => t.id === ct.taskId);
                                 if (task) {
                                     openDrawer('edit', task.id);
                                 }
+                            } else {
+                                // Single tap - select task (with delay to detect double tap)
+                                setTimeout(() => {
+                                    if (currentTime === lastTouchTime) {
+                                        selectTaskFromCalendar(ct.taskId);
+                                    }
+                                }, 400);
                             }
                             
                             lastTouchTime = currentTime;
@@ -2819,6 +2908,7 @@
                                     originalDuration = ct.duration || 60;
                                     taskEl.draggable = false; // Disable dragging while resizing
                                     taskEl.style.cursor = 'ns-resize';
+                                    taskEl.classList.add('resizing'); // Add resizing class for higher z-index
                                     resizeHandle.style.background = 'rgba(59, 130, 246, 0.3)'; // Blue highlight
                                 });
                                 
@@ -2827,18 +2917,38 @@
                                     e.preventDefault();
                                     
                                     const deltaY = e.clientY - resizeStartY;
-                                    // Each 30px = 30 minutes (half hour)
-                                    const newDuration = deltaY > 15 ? 60 : 30;
                                     
-                                    // Update visual height
-                                    taskEl.style.height = newDuration === 60 ? '56px' : '28px';
+                                    // Calculate duration based on drag distance
+                                    // Each 28px ≈ 30 minutes (half hour)
+                                    // Start from original duration
+                                    const draggedHalfHours = Math.round(deltaY / 28);
+                                    let newDuration = originalDuration + (draggedHalfHours * 30);
+                                    
+                                    // Constrain to valid range: 30min to 240min (4 hours)
+                                    newDuration = Math.max(30, Math.min(240, newDuration));
+                                    
+                                    // Round to nearest 30 minutes
+                                    newDuration = Math.round(newDuration / 30) * 30;
+                                    
+                                    // Update visual height (28px per 30 minutes)
+                                    const halfHours = newDuration / 30;
+                                    taskEl.style.height = (halfHours * 28) + 'px';
                                 });
                                 
                                 document.addEventListener('mouseup', (e) => {
                                     if (!isResizing) return;
                                     
                                     const deltaY = e.clientY - resizeStartY;
-                                    const newDuration = deltaY > 15 ? 60 : 30;
+                                    
+                                    // Calculate final duration
+                                    const draggedHalfHours = Math.round(deltaY / 28);
+                                    let newDuration = originalDuration + (draggedHalfHours * 30);
+                                    
+                                    // Constrain to valid range: 30min to 240min (4 hours)
+                                    newDuration = Math.max(30, Math.min(240, newDuration));
+                                    
+                                    // Round to nearest 30 minutes
+                                    newDuration = Math.round(newDuration / 30) * 30;
                                     
                                     // Update task duration
                                     ct.duration = newDuration;
@@ -2850,9 +2960,22 @@
                                     isResizing = false;
                                     taskEl.draggable = true;
                                     taskEl.style.cursor = 'move';
+                                    taskEl.classList.remove('resizing'); // Remove resizing class
                                     resizeHandle.style.background = 'transparent';
                                     
-                                    showToast(newDuration === 60 ? '已调整为1小时' : '已调整为30分钟');
+                                    // Format duration display
+                                    const hours = Math.floor(newDuration / 60);
+                                    const minutes = newDuration % 60;
+                                    let durationText = '';
+                                    if (hours > 0 && minutes > 0) {
+                                        durationText = `${hours}小时${minutes}分钟`;
+                                    } else if (hours > 0) {
+                                        durationText = `${hours}小时`;
+                                    } else {
+                                        durationText = `${minutes}分钟`;
+                                    }
+                                    
+                                    showToast(`已调整为${durationText}`);
                                 });
                                 
                                 // Prevent drag when interacting with resize handle
