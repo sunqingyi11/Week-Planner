@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.4.6">
+    <meta name="version" content="1.4.7">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -126,19 +126,16 @@
         /* Current time indicator */
         .current-time-line {
             position: absolute;
-            left: 40px;
-            right: 0;
             height: 2px;
             background-color: #ef4444;
             z-index: 20;
             pointer-events: none;
-            width: calc(100% - 40px);
         }
         
         .current-time-line::before {
             content: '';
             position: absolute;
-            left: -6px;
+            left: -5px;
             top: -4px;
             width: 10px;
             height: 10px;
@@ -150,9 +147,6 @@
         @media (max-width: 768px) {
             .current-time-line {
                 display: block !important;
-                left: 40px;
-                width: calc(100% - 40px);
-                min-width: 760px; /* Match calendar grid min-width */
                 z-index: 25;
             }
             
@@ -962,10 +956,10 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.4.6 Loaded - Z-index Complete Fix');
-        console.log('✅ 修复：表单提交事件监听器绑定时机问题（移入DOMContentLoaded）');
-        console.log('✅ 修复：完整的z-index层级（drawer:10000, backdrop:9999, calendarHeader:100, weekDays:90, sidebar:50）');
-        console.log('✅ 修复：weekDaysHeader遮罩层不遮挡日期标题');
+        console.log('Week Plan App - Version 1.4.7 Loaded - Timeline & Padding Polish');
+        console.log('✅ 优化：时间列左右padding均为8px');
+        console.log('✅ 优化：current timeline红色圆头与分割线左对齐');
+        console.log('✅ 优化：current timeline只显示在当天这一列');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -1718,15 +1712,39 @@
             const blockHeight = 60;
             const topPosition = (hourIndex + minutePercent) * blockHeight; // Position relative to calendarGrid
             
+            // Calculate which day column to show the line in
+            const today = new Date();
+            const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+            
+            // Calculate the start of the week (Sunday)
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(today.getDate() - dayOfWeek);
+            
+            // Find which day index within the current week (0-6)
+            const currentDayIndex = dayOfWeek;
+            
+            // Get calendar grid to calculate column width
+            const calendarGrid = document.getElementById('calendarGrid');
+            if (!calendarGrid) return;
+            
+            // Get the first calendar block to calculate column width
+            const firstBlock = document.querySelector('.calendar-block');
+            if (!firstBlock) return;
+            
+            const columnWidth = firstBlock.offsetWidth;
+            const timeColumnWidth = 64; // w-16 = 64px
+            
+            // Calculate left position: time column width + (day index * column width)
+            const leftPosition = timeColumnWidth + (currentDayIndex * columnWidth);
+            
             // Create time line
             const timeLine = document.createElement('div');
             timeLine.className = 'current-time-line';
             timeLine.style.top = `${topPosition}px`;
+            timeLine.style.left = `${leftPosition}px`;
+            timeLine.style.width = `${columnWidth}px`;
             
-            const calendarGrid = document.getElementById('calendarGrid');
-            if (calendarGrid) {
-                calendarGrid.appendChild(timeLine);
-            }
+            calendarGrid.appendChild(timeLine);
         }
         
         // Calendar Grid Generation
@@ -1737,7 +1755,7 @@
             hours.forEach((hour, hourIndex) => {
                 html += `
                     <div class="flex">
-                        <div class="w-16 flex-shrink-0 text-xs font-medium text-zinc-500 leading-4 pr-2 flex items-start pt-1 text-right">${hour}</div>
+                        <div class="w-16 flex-shrink-0 text-xs font-medium text-zinc-500 leading-4 px-2 flex items-start pt-1 text-right">${hour}</div>
                         <div class="flex flex-1">
                 `;
                 
