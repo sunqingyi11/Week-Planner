@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.5.0">
+    <meta name="version" content="1.5.1">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -957,9 +957,9 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.5.0 Loaded - Auto-save Feature');
-        console.log('✅ 新功能：关闭弹窗时自动保存任务（无需点击保存按钮）');
-        console.log('✅ 优化：禁用任务名称输入框的浏览器自动建议');
+        console.log('Week Plan App - Version 1.5.1 Loaded - Duration Bug Fix');
+        console.log('✅ 修复：同一单元格添加第二个task时自动调整duration为30分钟');
+        console.log('✅ 修复：移除task后自动恢复剩余task的duration为60分钟');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -2593,12 +2593,23 @@
                 };
                 
                 calendarTasks.push(calendarTask);
+                
+                // If this is the second task in the cell, adjust durations to 30 minutes for both
+                if (tasksInCell.length === 1) {
+                    // Force both tasks to 30 minutes when sharing a cell
+                    tasksInCell[0].duration = 30;
+                    calendarTask.duration = 30;
+                }
+                
                 saveDataToSupabase();
                 renderCalendarTasks();
             } else if (draggedCalendarTask) {
                 // Check if moving to a new cell
                 if (draggedCalendarTask.day !== day || 
                     draggedCalendarTask.hour !== hour) {
+                    
+                    const oldDay = draggedCalendarTask.day;
+                    const oldHour = draggedCalendarTask.hour;
                     
                     // Check how many tasks are in target cell
                     const tasksInTargetCell = calendarTasks.filter(ct => 
@@ -2612,9 +2623,29 @@
                         return;
                     }
                     
+                    // Get remaining tasks in the old cell
+                    const remainingInOldCell = calendarTasks.filter(ct => 
+                        ct.id !== draggedCalendarTask.id &&
+                        ct.day === oldDay && ct.hour === oldHour
+                    );
+                    
+                    // If only one task remains in old cell, restore its duration
+                    if (remainingInOldCell.length === 1) {
+                        remainingInOldCell[0].duration = 60;
+                    }
+                    
                     draggedCalendarTask.day = day;
                     draggedCalendarTask.hour = hour;
                     draggedCalendarTask.position = tasksInTargetCell.length;
+                    
+                    // If target cell now has 2 tasks, adjust durations to 30 minutes
+                    if (tasksInTargetCell.length === 1) {
+                        tasksInTargetCell[0].duration = 30;
+                        draggedCalendarTask.duration = 30;
+                    } else {
+                        // Moving to empty cell, restore to 60 minutes
+                        draggedCalendarTask.duration = 60;
+                    }
                 }
                 
                 saveDataToSupabase();
@@ -2812,6 +2843,9 @@
                                     
                                     // Check if moving to a new cell
                                     if (draggedCalendarTask.day !== day || draggedCalendarTask.hour !== hour) {
+                                        const oldDay = draggedCalendarTask.day;
+                                        const oldHour = draggedCalendarTask.hour;
+                                        
                                         const tasksInTargetCell = calendarTasks.filter(t => 
                                             t.id !== draggedCalendarTask.id &&
                                             t.day === day && t.hour === hour
@@ -2820,9 +2854,30 @@
                                         if (tasksInTargetCell.length >= 2) {
                                             showToast('每个时间块最多只能放置2个任务');
                                         } else {
+                                            // Get remaining tasks in the old cell
+                                            const remainingInOldCell = calendarTasks.filter(t => 
+                                                t.id !== draggedCalendarTask.id &&
+                                                t.day === oldDay && t.hour === oldHour
+                                            );
+                                            
+                                            // If only one task remains in old cell, restore its duration
+                                            if (remainingInOldCell.length === 1) {
+                                                remainingInOldCell[0].duration = 60;
+                                            }
+                                            
                                             draggedCalendarTask.day = day;
                                             draggedCalendarTask.hour = hour;
                                             draggedCalendarTask.position = tasksInTargetCell.length;
+                                            
+                                            // If target cell now has 2 tasks, adjust durations to 30 minutes
+                                            if (tasksInTargetCell.length === 1) {
+                                                tasksInTargetCell[0].duration = 30;
+                                                draggedCalendarTask.duration = 30;
+                                            } else {
+                                                // Moving to empty cell, restore to 60 minutes
+                                                draggedCalendarTask.duration = 60;
+                                            }
+                                            
                                             saveDataToSupabase();
                                         }
                                     }
@@ -2888,6 +2943,12 @@
                                 t.day === ct.day && t.hour === ct.hour
                             );
                             remaining.forEach((t, i) => t.position = i);
+                            
+                            // If only one task remains, restore its duration to default 60 minutes
+                            if (remaining.length === 1) {
+                                remaining[0].duration = 60;
+                            }
+                            
                             saveDataToSupabase();
                             renderCalendarTasks();
                             renderTasks(); // Re-render to update calendar icon status
@@ -3238,6 +3299,12 @@
                     t.day === contextMenuTarget.day && t.hour === contextMenuTarget.hour
                 );
                 remaining.forEach((t, i) => t.position = i);
+                
+                // If only one task remains, restore its duration to default 60 minutes
+                if (remaining.length === 1) {
+                    remaining[0].duration = 60;
+                }
+                
                 saveDataToSupabase();
                 renderCalendarTasks();
                 renderTasks();
