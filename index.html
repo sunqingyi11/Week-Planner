@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.4.3">
+    <meta name="version" content="1.4.4">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -706,7 +706,7 @@
         <div class="flex-1 flex flex-col calendar-container overflow-y-auto" style="background-color: #f7f9fa;">
             <div class="calendar-grid-wrapper px-8">
                 <!-- Calendar Header (Sticky) -->
-                <div id="calendarHeader" class="sticky top-0 z-50 py-4 flex items-center justify-between pl-2 transition-shadow" style="background-color: #f7f9fa;">
+                <div id="calendarHeader" class="sticky top-0 z-10 py-4 flex items-center justify-between pl-2 transition-shadow" style="background-color: #f7f9fa; opacity: 0;">
                     <div class="flex items-center gap-2.5">
                         <!-- Expand Sidebar Button (only visible when sidebar is collapsed) -->
                         <button id="expandSidebarBtn" onclick="toggleSidebar()" class="calendar-header-toggle w-6 h-6 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-all hidden" title="展开侧边栏">
@@ -714,7 +714,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
                             </svg>
                         </button>
-                        <div class="text-xl font-medium text-black" id="weekRange">本周安排: </div>
+                        <div class="text-xl font-medium text-black" id="weekRange"></div>
                     </div>
                     <!-- Clear Completed Status Button in Calendar Header -->
                     <button id="clearStatusBtnCalendar" onclick="showClearStatusConfirmation()" class="bg-white border border-slate-300 flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium text-gray-800 hover:bg-slate-50 transition-colors hidden" title="清空已完成状态">
@@ -729,7 +729,7 @@
                 </div>
                 
                 <!-- Week Days Header (Sticky) with cover layer -->
-                <div id="weekDaysHeader" class="sticky z-40 transition-shadow" style="top: 68px;">
+                <div id="weekDaysHeader" class="sticky z-20 transition-shadow" style="top: 68px; opacity: 0;">
                     <!-- Cover layer to prevent content from showing through -->
                     <div class="absolute inset-x-0 -top-10 bottom-0" style="background-color: #f7f9fa; z-index: -1;"></div>
                     <div class="flex bg-white rounded-tl-3xl rounded-tr-3xl overflow-hidden">
@@ -971,10 +971,11 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.4.3 Loaded - UI Polish');
-        console.log('✅ 优化：时间列（7 AM等）改为右对齐');
-        console.log('✅ 修复：日历添加任务和蒙层z-index问题');
-        console.log('✅ 双击编辑：列表和日历视图统一');
+        console.log('Week Plan App - Version 1.4.4 Loaded - Calendar & Layer Fixes');
+        console.log('✅ 修复："本周安排"加载时机问题（初始隐藏，100ms后显示）');
+        console.log('✅ 修复：z-index层级（header: 10, weekDays: 20, backdrop: 9999, drawer: 10000）');
+        console.log('✅ 优化：时间列右对齐');
+        console.log('✅ 调试：添加详细日志帮助排查日历创建问题');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -1493,6 +1494,14 @@
             // Then initialize week dates and time line
             initializeWeekDates();
             
+            // Show calendar headers after initialization
+            setTimeout(() => {
+                const calendarHeader = document.getElementById('calendarHeader');
+                const weekDaysHeader = document.getElementById('weekDaysHeader');
+                if (calendarHeader) calendarHeader.style.opacity = '1';
+                if (weekDaysHeader) weekDaysHeader.style.opacity = '1';
+            }, 100);
+            
             // Setup scroll listener for shadow effect
             const calendarContainer = document.querySelector('.calendar-container');
             const weekDaysHeader = document.getElementById('weekDaysHeader');
@@ -1717,10 +1726,14 @@
             const day = parseInt(block.dataset.day);
             const hour = parseInt(block.dataset.hour);
             
+            console.log('🖱️ 点击日历单元格:', { day, hour });
+            
             // Check if there's room for more tasks
             const tasksInCell = calendarTasks.filter(ct => 
                 ct.day === day && ct.hour === hour
             );
+            
+            console.log('📊 当前单元格任务数:', tasksInCell.length);
             
             if (tasksInCell.length >= 2) {
                 showToast('该时间块已满，最多只能放置2个任务');
@@ -1733,6 +1746,8 @@
                 hour: hour,
                 position: tasksInCell.length
             };
+            
+            console.log('✅ 设置 pendingCalendarPosition:', pendingCalendarPosition);
             
             // Open drawer to create new task with calendar defaults
             openDrawer('create', null, true);
@@ -1832,11 +1847,14 @@
         // Task Form Submission
         document.getElementById('taskForm').addEventListener('submit', (e) => {
             e.preventDefault();
+            console.log('📝 表单提交开始...');
             
             const taskId = document.getElementById('taskId').value;
             const name = document.getElementById('taskName').value.trim();
             const quadrant = document.getElementById('taskQuadrant').value;
             const color = document.getElementById('taskColor').value;
+            
+            console.log('表单数据:', { taskId, name, quadrant, color, pendingCalendarPosition });
             
             if (!name) {
                 showToast('请输入任务名称');
@@ -1875,6 +1893,7 @@
                 
                 // If created from calendar, automatically add to calendar at that position
                 if (pendingCalendarPosition) {
+                    console.log('✅ 从日历创建，添加到日历位置:', pendingCalendarPosition);
                     const calendarTask = {
                         id: Date.now().toString() + '_cal',
                         taskId: newTaskId,
@@ -1886,15 +1905,24 @@
                         duration: 60 // Default 60 minutes (1 hour)
                     };
                     calendarTasks.push(calendarTask);
+                    console.log('📅 日历任务已添加:', calendarTask);
+                    console.log('📊 当前所有日历任务:', calendarTasks.length);
                     pendingCalendarPosition = null; // Reset
+                } else {
+                    console.log('⚠️ 不是从日历创建的任务');
                 }
             }
             
+            console.log('💾 保存数据...');
             saveDataToSupabase();
+            console.log('🎨 渲染任务列表...');
             renderTasks();
+            console.log('📅 渲染日历任务...');
             renderCalendarTasks();
+            console.log('❌ 关闭弹窗...');
             closeDrawer();
             showToast(taskId ? '任务已更新' : '任务已创建');
+            console.log('✅ 表单提交完成！');
         });
         
         // Section Toggle - Only one section open at a time
