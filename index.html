@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.1.7">
+    <meta name="version" content="1.1.9">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -40,20 +40,11 @@
         
         /* Task selected state */
         .task-card.task-selected {
-            background-color: rgba(0, 0, 0, 0.03);
-        }
-        
-        .task-card.task-selected .task-bar {
-            opacity: 0.5;
+            /* Border color will be set dynamically via inline style */
         }
         
         .calendar-task.task-selected {
-            background-color: rgba(0, 0, 0, 0.03);
-            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
-        }
-        
-        .calendar-task.task-selected > div:first-child {
-            opacity: 0.5;
+            /* Border color will be set dynamically via inline style */
         }
         
         .calendar-block {
@@ -570,7 +561,7 @@
                      ondragover="handleSectionDragOver(event, 'planning')"
                      ondragleave="handleSectionDragLeave(event)"
                      ondrop="handleSectionDrop(event, 'planning')">
-                    <h3 class="text-xl font-medium text-black cursor-pointer flex-1" onclick="toggleSection('planning')">计划中 (<span id="planningCount">0</span>)</h3>
+                    <h3 class="text-base font-medium text-black cursor-pointer flex-1" onclick="toggleSection('planning')">计划中 (<span id="planningCount">0</span>)</h3>
                     <svg id="planningChevron" class="w-6 h-6 transform rotate-180 transition-transform cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24" onclick="toggleSection('planning')">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
@@ -620,7 +611,7 @@
                      ondragover="handleSectionDragOver(event, 'thisweek')"
                      ondragleave="handleSectionDragLeave(event)"
                      ondrop="handleSectionDrop(event, 'thisweek')">
-                    <h3 class="text-xl font-medium text-black cursor-pointer flex-1" onclick="toggleSection('thisweek')">本周要务 (<span id="thisweekCount">0</span>)</h3>
+                    <h3 class="text-base font-medium text-black cursor-pointer flex-1" onclick="toggleSection('thisweek')">本周要务 (<span id="thisweekCount">0</span>)</h3>
                     <svg id="thisweekChevron" class="w-6 h-6 transition-transform cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24" onclick="toggleSection('thisweek')">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
@@ -660,7 +651,7 @@
                      ondragover="handleSectionDragOver(event, 'finished')"
                      ondragleave="handleSectionDragLeave(event)"
                      ondrop="handleSectionDrop(event, 'finished')">
-                    <h3 class="text-xl font-medium text-black">已完成 (<span id="finishedCount">0</span>)</h3>
+                    <h3 class="text-base font-medium text-black">已完成 (<span id="finishedCount">0</span>)</h3>
                     <svg id="finishedChevron" class="w-6 h-6 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
@@ -950,8 +941,8 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.1.7 Loaded');
-        console.log('✅ 在第一行上方添加8px间距，防止被表头遮挡');
+        console.log('Week Plan App - Version 1.1.9 Loaded');
+        console.log('✅ 选中task改为彩色描边，颜色与Bar颜色一致');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -977,6 +968,15 @@
             'emerald': 'bg-emerald-500',
             'amber': 'bg-amber-500',
             'rose': 'bg-rose-500'
+        };
+        
+        const borderColorMap = {
+            'violet': '#8B5CF6',
+            'yellow': '#EAB308',
+            'cyan': '#0EA5E9',
+            'emerald': '#10B981',
+            'amber': '#F59E0B',
+            'rose': '#F43F5E'
         };
         
         const hours = [
@@ -2716,22 +2716,33 @@
             // Remove all previous selections
             document.querySelectorAll('.task-selected').forEach(el => {
                 el.classList.remove('task-selected');
+                el.style.border = '';
+                el.style.borderLeft = '';
             });
             
             if (!selectedTaskId) return;
             
-            // Highlight task in sidebar
+            // Find the task to get its color
+            const task = tasks.find(t => t.id === selectedTaskId);
+            if (!task) return;
+            
+            const borderColor = borderColorMap[task.color] || '#10B981';
+            
+            // Highlight task in sidebar with colored border
             const sidebarTask = document.querySelector(`.task-card[data-task-id="${selectedTaskId}"]`);
             if (sidebarTask) {
                 sidebarTask.classList.add('task-selected');
+                sidebarTask.style.border = `1px solid ${borderColor}`;
+                sidebarTask.style.borderLeft = '0';
             }
             
-            // Highlight all calendar instances
+            // Highlight all calendar instances with colored border
             const calendarInstances = calendarTasks.filter(ct => ct.taskId === selectedTaskId);
             calendarInstances.forEach(ct => {
                 const calendarElement = document.querySelector(`.calendar-task[title="${ct.name}"]`);
                 if (calendarElement) {
                     calendarElement.classList.add('task-selected');
+                    calendarElement.style.border = `1px solid ${borderColor}`;
                 }
             });
         }
