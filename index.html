@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.0.6">
+    <meta name="version" content="1.0.7">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -102,22 +102,19 @@
         }
         
         .sidebar {
-            transition: transform 0.3s ease-in-out, width 0.3s ease-in-out;
+            transition: margin-left 0.3s ease-in-out;
             position: relative;
             width: 320px;
             flex-shrink: 0;
+            margin-left: 0;
         }
         
         .sidebar-collapsed {
-            transform: translateX(-320px);
-            width: 0;
-            overflow: hidden;
-            min-width: 0;
+            margin-left: -320px;
         }
         
         /* Calendar view expansion when sidebar is collapsed */
         .calendar-container {
-            transition: all 0.3s ease-in-out;
             flex: 1;
         }
         
@@ -581,9 +578,9 @@
                      ondragleave="handleSectionDragLeave(event)"
                      ondrop="handleSectionDrop(event, 'planning')">
                     <h3 class="text-xl font-medium text-black cursor-pointer flex-1" onclick="toggleSection('planning')">计划中 (<span id="planningCount">0</span>)</h3>
-                    <button id="planningAddBtn" onclick="event.stopPropagation(); openDrawerForSection('planning')" class="flex items-center gap-1 text-sm font-medium transition-colors" title="添加任务">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    <button id="planningAddBtn" onclick="event.stopPropagation(); openDrawerForSection('planning')" class="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors" title="添加任务">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                         </svg>
                         <span id="planningAddBtnText">添加任务</span>
                     </button>
@@ -636,9 +633,9 @@
                      ondragleave="handleSectionDragLeave(event)"
                      ondrop="handleSectionDrop(event, 'thisweek')">
                     <h3 class="text-xl font-medium text-black cursor-pointer flex-1" onclick="toggleSection('thisweek')">本周要务 (<span id="thisweekCount">0</span>)</h3>
-                    <button id="thisweekAddBtn" onclick="event.stopPropagation(); openDrawerForSection('thisweek')" class="flex items-center gap-1 text-sm font-medium transition-colors" title="添加任务">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    <button id="thisweekAddBtn" onclick="event.stopPropagation(); openDrawerForSection('thisweek')" class="flex items-center gap-2 px-3 py-1.5 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 transition-colors" title="添加任务">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                         </svg>
                         <span id="thisweekAddBtnText">添加任务</span>
                     </button>
@@ -705,7 +702,7 @@
         <div class="flex-1 flex flex-col calendar-container overflow-y-auto" style="background-color: #f7f9fa;">
             <div class="calendar-grid-wrapper px-8">
                 <!-- Calendar Header (Sticky) -->
-                <div class="py-4 sticky top-0 z-40 flex items-center justify-between pl-2" style="background-color: #f7f9fa;">
+                <div class="py-4 sticky top-0 z-50 flex items-center justify-between pl-2" style="background-color: #f7f9fa;">
                     <div class="flex items-center gap-2.5">
                         <!-- Expand Sidebar Button (only visible when sidebar is collapsed) -->
                         <button id="expandSidebarBtn" onclick="toggleSidebar()" class="calendar-header-toggle w-6 h-6 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-all hidden" title="展开侧边栏">
@@ -724,7 +721,7 @@
                 <!-- Calendar Grid -->
                 <div class="bg-white rounded-tl-3xl rounded-tr-3xl overflow-hidden shadow-sm">
                     <!-- Week Days Header (Sticky) -->
-                    <div class="flex sticky top-[68px] z-30 bg-white">
+                    <div class="flex sticky top-[68px] z-40 bg-white">
                         <div class="w-16 flex-shrink-0 pl-2"></div>
                         <div class="flex flex-1">
                             <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-0">
@@ -960,7 +957,8 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.0.6 Loaded');
+        console.log('Week Plan App - Version 1.0.7 Loaded');
+        console.log('✅ 已修复：日历表头置顶、侧边栏收起自适应、添加按钮样式、选中状态');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -2796,29 +2794,34 @@
         function updateAddButtonStyles(section, taskCount) {
             const btn = document.getElementById(`${section}AddBtn`);
             const btnText = document.getElementById(`${section}AddBtnText`);
+            const svg = btn ? btn.querySelector('svg') : null;
             
-            if (!btn || !btnText) return;
+            if (!btn || !btnText || !svg) return;
             
             if (taskCount === 0) {
                 // No tasks: Black background primary button
-                btn.className = 'flex items-center gap-1 px-3 py-1.5 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 transition-colors';
+                btn.className = 'flex items-center gap-2 px-3 py-1.5 bg-slate-900 text-white text-sm font-medium rounded-md hover:bg-slate-800 transition-colors';
                 btnText.classList.remove('hidden');
+                svg.setAttribute('class', 'w-3 h-3');
             } else {
-                // Has tasks: Blue text button
-                btn.className = 'flex items-center gap-1 text-blue-600 text-sm font-medium hover:text-blue-700 transition-colors';
-                btnText.classList.add('hidden');
+                // Has tasks: Blue text button (icon + text)
+                btn.className = 'flex items-center gap-2 text-blue-600 text-sm font-medium hover:text-blue-700 transition-colors';
+                btnText.classList.remove('hidden');
+                svg.setAttribute('class', 'w-3 h-3');
             }
         }
         
         // Update clear status button visibility
         function updateClearStatusButton(finishedCount) {
-            const btn = document.getElementById('clearStatusBtn');
-            if (!btn) return;
+            const sidebarBtn = document.getElementById('clearStatusBtn');
+            const calendarBtn = document.getElementById('clearStatusBtnCalendar');
             
             if (finishedCount > 0) {
-                btn.classList.remove('hidden');
+                if (sidebarBtn) sidebarBtn.classList.remove('hidden');
+                if (calendarBtn) calendarBtn.classList.remove('hidden');
             } else {
-                btn.classList.add('hidden');
+                if (sidebarBtn) sidebarBtn.classList.add('hidden');
+                if (calendarBtn) calendarBtn.classList.add('hidden');
             }
         }
         
