@@ -2372,10 +2372,13 @@
             const displayName = getTaskDisplayName(task);
             const hasSubtasks = task.subtasks && task.subtasks.length > 0;
             
-            // Debug log
-            if (hasSubtasks) {
-                console.log(`Task "${task.name}" has ${task.subtasks.length} subtasks - should show dropdown icon`);
-            }
+            // Debug log - 详细检查
+            console.log(`[createTaskElement] 渲染任务: "${task.name}"`);
+            console.log(`  - subtasks字段:`, task.subtasks);
+            console.log(`  - 是否有subtasks:`, hasSubtasks);
+            console.log(`  - subtasks类型:`, typeof task.subtasks);
+            console.log(`  - 是数组:`, Array.isArray(task.subtasks));
+            console.log(`  - 长度:`, task.subtasks ? task.subtasks.length : 'undefined');
             
             // Calendar icon if added to calendar
             const calendarIcon = isInCalendar ? `
