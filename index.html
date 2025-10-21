@@ -2372,6 +2372,11 @@
             const displayName = getTaskDisplayName(task);
             const hasSubtasks = task.subtasks && task.subtasks.length > 0;
             
+            // Debug log
+            if (hasSubtasks) {
+                console.log(`Task "${task.name}" has ${task.subtasks.length} subtasks - should show dropdown icon`);
+            }
+            
             // Calendar icon if added to calendar
             const calendarIcon = isInCalendar ? `
                 <svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
