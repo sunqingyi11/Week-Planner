@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.5.1">
+    <meta name="version" content="1.6.0">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -499,6 +499,39 @@
                         <input type="hidden" id="taskColor" value="violet">
                     </div>
                     
+                    <!-- Subtasks Field -->
+                    <div class="flex flex-col gap-2">
+                        <button 
+                            type="button" 
+                            id="toggleSubtasksBtn"
+                            onclick="toggleSubtasksSection()"
+                            class="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
+                        >
+                            <svg id="subtasksChevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                            <span>添加子任务</span>
+                            <span id="subtaskCount" class="text-xs text-gray-400"></span>
+                        </button>
+                        
+                        <div id="subtasksSection" class="hidden flex flex-col gap-2 pl-6">
+                            <div id="subtasksList" class="flex flex-col gap-2">
+                                <!-- Subtasks will be rendered here -->
+                            </div>
+                            <button 
+                                type="button" 
+                                id="addSubtaskBtn"
+                                onclick="addSubtask()"
+                                class="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 transition-colors"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span>新增子任务</span>
+                            </button>
+                        </div>
+                    </div>
+                    
                     <!-- Save Button -->
                     <div class="mt-8">
                         <button 
@@ -694,12 +727,12 @@
                 <!-- Calendar Header (Sticky) -->
                 <div id="calendarHeader" class="sticky top-0 z-[100] py-4 flex items-center justify-between pl-2 transition-shadow" style="background-color: #f7f9fa; opacity: 0;">
                     <div class="flex items-center gap-2.5">
-                        <!-- Expand Sidebar Button (only visible when sidebar is collapsed) -->
+                    <!-- Expand Sidebar Button (only visible when sidebar is collapsed) -->
                         <button id="expandSidebarBtn" onclick="toggleSidebar()" class="calendar-header-toggle w-6 h-6 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-all hidden" title="展开侧边栏">
-                            <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                            </svg>
-                        </button>
+                        </svg>
+                    </button>
                         <div class="text-xl font-medium text-black" id="weekRange"></div>
                     </div>
                     <!-- Clear Completed Status Button in Calendar Header -->
@@ -722,37 +755,37 @@
                         <div class="w-16 flex-shrink-0 pl-2 bg-white"></div>
                         <div class="flex flex-1">
                         <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-0">
-                            <div class="text-xs font-bold text-zinc-500">21</div>
+                                <div class="text-xs font-bold text-zinc-500">21</div>
                             <div class="text-base font-medium text-black">周日</div>
-                        </div>
-                        <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-1">
-                            <div class="text-xs font-bold text-zinc-500">22</div>
+                            </div>
+                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-1">
+                                <div class="text-xs font-bold text-zinc-500">22</div>
                             <div class="text-base font-medium text-black">周一</div>
-                        </div>
-                        <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-2">
-                            <div class="text-xs font-bold text-zinc-500">23</div>
+                            </div>
+                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-2">
+                                <div class="text-xs font-bold text-zinc-500">23</div>
                             <div class="text-base font-medium text-black">周二</div>
-                        </div>
-                        <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-3">
-                            <div class="text-xs font-bold text-zinc-500">24</div>
+                            </div>
+                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-3">
+                                <div class="text-xs font-bold text-zinc-500">24</div>
                             <div class="text-base font-medium text-black">周三</div>
-                        </div>
-                        <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-4">
-                            <div class="text-xs font-bold text-zinc-500">25</div>
+                            </div>
+                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-4">
+                                <div class="text-xs font-bold text-zinc-500">25</div>
                             <div class="text-base font-medium text-black">周四</div>
-                        </div>
-                        <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-5">
-                            <div class="text-xs font-bold text-zinc-500">26</div>
+                            </div>
+                            <div class="flex-1 bg-white border-r border-b border-slate-200 px-2 py-1 day-header" id="day-5">
+                                <div class="text-xs font-bold text-zinc-500">26</div>
                             <div class="text-base font-medium text-black">周五</div>
-                        </div>
+                            </div>
                         <div class="flex-1 bg-white border-b border-slate-200 px-2 py-1 day-header" id="day-6">
-                            <div class="text-xs font-bold text-zinc-500">27</div>
+                                <div class="text-xs font-bold text-zinc-500">27</div>
                             <div class="text-base font-medium text-black">周六</div>
                         </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                
+                    
                 <!-- Calendar Grid -->
                 <div class="bg-white" style="padding-top: 8px;">
                     <!-- Time Rows -->
@@ -957,9 +990,10 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.5.1 Loaded - Duration Bug Fix');
-        console.log('✅ 修复：同一单元格添加第二个task时自动调整duration为30分钟');
-        console.log('✅ 修复：移除task后自动恢复剩余task的duration为60分钟');
+        console.log('Week Plan App - Version 1.6.0 Loaded - Subtasks Feature');
+        console.log('✅ 新功能：支持添加子任务（最多8个）');
+        console.log('✅ 新功能：日历和列表视图支持显示和切换子任务');
+        console.log('✅ 新功能：侧边栏切换子任务会同步所有日历实例');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -1691,7 +1725,7 @@
             timeLine.style.left = `${leftPosition}px`;
             timeLine.style.width = `${columnWidth}px`;
             
-            calendarGrid.appendChild(timeLine);
+                calendarGrid.appendChild(timeLine);
         }
         
         // Calendar Grid Generation
@@ -1808,6 +1842,7 @@
             document.getElementById('taskColor').value = 'violet';
             document.getElementById('taskQuadrant').value = '重要不紧急';
             selectColor('violet');
+            clearSubtasksForm();
             
             // Store the target section
             form.dataset.targetSection = section;
@@ -1838,6 +1873,7 @@
                     document.getElementById('taskQuadrant').value = task.quadrant;
                     document.getElementById('taskColor').value = task.color;
                     selectColor(task.color);
+                    loadSubtasksToForm(task);
                 }
             } else {
                 title.textContent = '添加任务';
@@ -1850,10 +1886,11 @@
                 if (fromCalendar) {
                     document.getElementById('taskQuadrant').value = '不重要但紧急';
                 } else {
-                    document.getElementById('taskQuadrant').value = '重要不紧急';
+                document.getElementById('taskQuadrant').value = '重要不紧急';
                 }
                 
                 selectColor('violet');
+                clearSubtasksForm();
             }
             
             // Focus on name input
@@ -1875,19 +1912,44 @@
                 return false;
             }
             
+            // Process subtasks - filter out empty ones
+            const validSubtasks = tempSubtasks
+                .filter(st => st.name.trim() !== '')
+                .map(st => ({ id: st.id, name: st.name.trim() }));
+            
             if (taskId) {
                 // Edit existing task
                 const task = tasks.find(t => t.id === taskId);
                 if (task) {
+                    const hadSubtasksBefore = task.subtasks && task.subtasks.length > 0;
+                    
                     task.name = name;
                     task.quadrant = quadrant;
                     task.color = color;
+                    task.subtasks = validSubtasks;
                     
-                    // Update all calendar instances
+                    // Set activeSubtaskIndex if subtasks exist
+                    if (validSubtasks.length > 0) {
+                        // Keep existing index if still valid, otherwise reset to 0
+                        if (!task.activeSubtaskIndex || task.activeSubtaskIndex >= validSubtasks.length) {
+                            task.activeSubtaskIndex = 0;
+                        }
+                    } else {
+                        delete task.activeSubtaskIndex;
+                    }
+                    
+                    // Update all calendar instances with parent name only
+                    // Calendar instances will have their own activeSubtaskIndex
                     calendarTasks.forEach(ct => {
                         if (ct.taskId === taskId) {
                             ct.name = name;
                             ct.color = color;
+                            // Reset calendar instance activeSubtaskIndex if parent task changed
+                            if (validSubtasks.length > 0 && (!ct.activeSubtaskIndex || ct.activeSubtaskIndex >= validSubtasks.length)) {
+                                ct.activeSubtaskIndex = task.activeSubtaskIndex || 0;
+                            } else if (validSubtasks.length === 0) {
+                                delete ct.activeSubtaskIndex;
+                            }
                         }
                     });
                 }
@@ -1900,8 +1962,15 @@
                     name,
                     quadrant,
                     color,
-                    section: targetSection
+                    section: targetSection,
+                    subtasks: validSubtasks
                 };
+                
+                // Set activeSubtaskIndex if subtasks exist
+                if (validSubtasks.length > 0) {
+                    newTask.activeSubtaskIndex = 0;
+                }
+                
                 tasks.push(newTask);
                 
                 // If created from calendar, automatically add to calendar at that position
@@ -1916,6 +1985,12 @@
                         position: pendingCalendarPosition.position,
                         duration: 60 // Default 60 minutes (1 hour)
                     };
+                    
+                    // Set activeSubtaskIndex if the task has subtasks
+                    if (validSubtasks.length > 0) {
+                        calendarTask.activeSubtaskIndex = 0;
+                    }
+                    
                     calendarTasks.push(calendarTask);
                 }
             }
@@ -1925,7 +2000,7 @@
             renderCalendarTasks();
             
             if (showToastMessage) {
-                showToast(taskId ? '任务已更新' : '任务已创建');
+            showToast(taskId ? '任务已更新' : '任务已创建');
             }
             
             return true;
@@ -1957,6 +2032,135 @@
             });
             document.querySelector(`.color-option[data-color="${color}"]`).classList.add('selected');
             document.getElementById('taskColor').value = color;
+        }
+        
+        // Subtask Management
+        let tempSubtasks = []; // Temporary storage for subtasks during editing
+        
+        function toggleSubtasksSection() {
+            const section = document.getElementById('subtasksSection');
+            const chevron = document.getElementById('subtasksChevron');
+            const isHidden = section.classList.contains('hidden');
+            
+            if (isHidden) {
+                section.classList.remove('hidden');
+                chevron.style.transform = 'rotate(90deg)';
+                // If no subtasks exist, add one
+                if (tempSubtasks.length === 0) {
+                    addSubtask();
+                }
+            } else {
+                section.classList.add('hidden');
+                chevron.style.transform = 'rotate(0deg)';
+            }
+        }
+        
+        function addSubtask() {
+            if (tempSubtasks.length >= 8) {
+                showToast('最多只能添加8个子任务');
+                return;
+            }
+            
+            tempSubtasks.push({ name: '', id: Date.now().toString() });
+            renderSubtasksList();
+            updateSubtaskCount();
+        }
+        
+        function removeSubtask(subtaskId) {
+            tempSubtasks = tempSubtasks.filter(st => st.id !== subtaskId);
+            renderSubtasksList();
+            updateSubtaskCount();
+            
+            // If no subtasks remain, collapse the section
+            if (tempSubtasks.length === 0) {
+                const section = document.getElementById('subtasksSection');
+                const chevron = document.getElementById('subtasksChevron');
+                section.classList.add('hidden');
+                chevron.style.transform = 'rotate(0deg)';
+            }
+        }
+        
+        function updateSubtaskName(subtaskId, name) {
+            const subtask = tempSubtasks.find(st => st.id === subtaskId);
+            if (subtask) {
+                subtask.name = name;
+            }
+        }
+        
+        function renderSubtasksList() {
+            const container = document.getElementById('subtasksList');
+            container.innerHTML = '';
+            
+            tempSubtasks.forEach((subtask, index) => {
+                const subtaskEl = document.createElement('div');
+                subtaskEl.className = 'flex items-center gap-2';
+                subtaskEl.innerHTML = `
+                    <input 
+                        type="text" 
+                        value="${escapeHtml(subtask.name)}"
+                        placeholder="子任务${index + 1}"
+                        class="flex-1 border border-slate-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        oninput="updateSubtaskName('${subtask.id}', this.value)"
+                    />
+                    <button 
+                        type="button"
+                        onclick="removeSubtask('${subtask.id}')"
+                        class="flex-shrink-0 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="删除子任务"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                `;
+                container.appendChild(subtaskEl);
+            });
+            
+            // Update add button visibility
+            const addBtn = document.getElementById('addSubtaskBtn');
+            if (tempSubtasks.length >= 8) {
+                addBtn.classList.add('hidden');
+            } else {
+                addBtn.classList.remove('hidden');
+            }
+        }
+        
+        function updateSubtaskCount() {
+            const countEl = document.getElementById('subtaskCount');
+            if (tempSubtasks.length > 0) {
+                countEl.textContent = `(${tempSubtasks.length}/8)`;
+            } else {
+                countEl.textContent = '';
+            }
+        }
+        
+        function loadSubtasksToForm(task) {
+            tempSubtasks = task.subtasks ? [...task.subtasks] : [];
+            
+            if (tempSubtasks.length > 0) {
+                const section = document.getElementById('subtasksSection');
+                const chevron = document.getElementById('subtasksChevron');
+                section.classList.remove('hidden');
+                chevron.style.transform = 'rotate(90deg)';
+                renderSubtasksList();
+            } else {
+                const section = document.getElementById('subtasksSection');
+                const chevron = document.getElementById('subtasksChevron');
+                section.classList.add('hidden');
+                chevron.style.transform = 'rotate(0deg)';
+            }
+            
+            updateSubtaskCount();
+        }
+        
+        function clearSubtasksForm() {
+            tempSubtasks = [];
+            const section = document.getElementById('subtasksSection');
+            const chevron = document.getElementById('subtasksChevron');
+            section.classList.add('hidden');
+            chevron.style.transform = 'rotate(0deg)';
+            document.getElementById('subtasksList').innerHTML = '';
+            updateSubtaskCount();
         }
         
         // Section Toggle - Only one section open at a time
@@ -2224,11 +2428,24 @@
             div.dataset.taskId = task.id;
             div.dataset.quadrant = task.quadrant;
             
+            // Get display name and check if task has subtasks
+            const displayName = getTaskDisplayName(task);
+            const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+            
             // Calendar icon if added to calendar
             const calendarIcon = isInCalendar ? `
                 <svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
+            ` : '';
+            
+            // Subtask dropdown icon - only show if task has subtasks
+            const subtaskDropdownIcon = hasSubtasks ? `
+                <button class="subtask-dropdown-sidebar-btn w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded flex-shrink-0 transition-all" title="切换子任务">
+                    <svg class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
             ` : '';
             
             div.innerHTML = `
@@ -2244,7 +2461,8 @@
                     </svg>
                 </div>
                 ${calendarIcon}
-                <div class="flex-1 text-sm font-medium truncate task-name" style="color: #1e1e1e;">${escapeHtml(task.name)}</div>
+                <div class="flex-1 text-sm font-medium truncate task-name" style="color: #1e1e1e;">${escapeHtml(displayName)}</div>
+                ${subtaskDropdownIcon}
                 <button class="edit-button w-6 h-6 flex items-center justify-center hover:bg-gray-100 rounded flex-shrink-0" onclick="event.stopPropagation(); openDrawer('edit', '${task.id}')" title="编辑任务">
                     <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -2278,6 +2496,15 @@
                     zone.classList.remove('drag-over-quadrant');
                 });
             });
+            
+            // Subtask dropdown button event handler
+            const subtaskDropdownBtn = div.querySelector('.subtask-dropdown-sidebar-btn');
+            if (subtaskDropdownBtn) {
+                subtaskDropdownBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showSubtaskDropdown(task, subtaskDropdownBtn, 'sidebar');
+                });
+            }
             
             // Prevent drag when clicking buttons
             const buttons = div.querySelectorAll('button');
@@ -2342,6 +2569,172 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+        
+        // Get display name for a task (with subtask if applicable)
+        function getTaskDisplayName(task, subtaskIndex = null) {
+            if (!task.subtasks || task.subtasks.length === 0) {
+                return task.name;
+            }
+            
+            // Use provided index or task's activeSubtaskIndex
+            const index = subtaskIndex !== null ? subtaskIndex : (task.activeSubtaskIndex || 0);
+            
+            if (index >= 0 && index < task.subtasks.length) {
+                return `${task.name}：${task.subtasks[index].name}`;
+            }
+            
+            return task.name;
+        }
+        
+        // Get display name for a calendar task
+        function getCalendarTaskDisplayName(calendarTask) {
+            const parentTask = tasks.find(t => t.id === calendarTask.taskId);
+            if (!parentTask || !parentTask.subtasks || parentTask.subtasks.length === 0) {
+                return calendarTask.name;
+            }
+            
+            // Use calendar task's own activeSubtaskIndex
+            const index = calendarTask.activeSubtaskIndex !== undefined ? calendarTask.activeSubtaskIndex : (parentTask.activeSubtaskIndex || 0);
+            
+            if (index >= 0 && index < parentTask.subtasks.length) {
+                return `${calendarTask.name}：${parentTask.subtasks[index].name}`;
+            }
+            
+            return calendarTask.name;
+        }
+        
+        // Check if task has subtasks
+        function taskHasSubtasks(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            return task && task.subtasks && task.subtasks.length > 0;
+        }
+        
+        // Show subtask dropdown menu
+        function showSubtaskDropdown(taskOrCalendarTask, triggerElement, source) {
+            // Remove any existing dropdown
+            const existingDropdown = document.querySelector('.subtask-dropdown-menu');
+            if (existingDropdown) {
+                existingDropdown.remove();
+            }
+            
+            // Get parent task
+            let parentTask;
+            let currentIndex;
+            
+            if (source === 'calendar') {
+                parentTask = tasks.find(t => t.id === taskOrCalendarTask.taskId);
+                currentIndex = taskOrCalendarTask.activeSubtaskIndex !== undefined ? 
+                    taskOrCalendarTask.activeSubtaskIndex : (parentTask?.activeSubtaskIndex || 0);
+            } else {
+                parentTask = taskOrCalendarTask;
+                currentIndex = parentTask.activeSubtaskIndex || 0;
+            }
+            
+            if (!parentTask || !parentTask.subtasks || parentTask.subtasks.length === 0) {
+                return;
+            }
+            
+            // Create dropdown menu
+            const dropdown = document.createElement('div');
+            dropdown.className = 'subtask-dropdown-menu';
+            dropdown.style.cssText = `
+                position: absolute;
+                background: white;
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                z-index: 1000;
+                min-width: 200px;
+                max-width: 300px;
+                padding: 4px 0;
+            `;
+            
+            // Position dropdown below trigger element
+            const rect = triggerElement.getBoundingClientRect();
+            dropdown.style.top = (rect.bottom + 4) + 'px';
+            dropdown.style.left = rect.left + 'px';
+            
+            // Add subtask options
+            parentTask.subtasks.forEach((subtask, index) => {
+                const option = document.createElement('div');
+                const isActive = index === currentIndex;
+                option.className = 'subtask-dropdown-option';
+                option.style.cssText = `
+                    padding: 8px 12px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    color: ${isActive ? '#1e293b' : '#64748b'};
+                    font-weight: ${isActive ? '500' : '400'};
+                    background: ${isActive ? '#f1f5f9' : 'transparent'};
+                    transition: all 0.15s;
+                `;
+                
+                option.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        ${isActive ? '<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>' : '<div style="width: 12px;"></div>'}
+                        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(subtask.name)}</span>
+                    </div>
+                `;
+                
+                option.addEventListener('mouseenter', () => {
+                    if (!isActive) {
+                        option.style.background = '#f8fafc';
+                    }
+                });
+                
+                option.addEventListener('mouseleave', () => {
+                    if (!isActive) {
+                        option.style.background = 'transparent';
+                    }
+                });
+                
+                option.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    switchSubtask(taskOrCalendarTask, index, source);
+                    dropdown.remove();
+                });
+                
+                dropdown.appendChild(option);
+            });
+            
+            document.body.appendChild(dropdown);
+            
+            // Close dropdown when clicking outside
+            setTimeout(() => {
+                const closeDropdown = (e) => {
+                    if (!dropdown.contains(e.target) && !triggerElement.contains(e.target)) {
+                        dropdown.remove();
+                        document.removeEventListener('click', closeDropdown);
+                    }
+                };
+                document.addEventListener('click', closeDropdown);
+            }, 0);
+        }
+        
+        // Switch active subtask
+        function switchSubtask(taskOrCalendarTask, newIndex, source) {
+            if (source === 'calendar') {
+                // Calendar view: only update this specific calendar instance
+                taskOrCalendarTask.activeSubtaskIndex = newIndex;
+                saveDataToSupabase();
+                renderCalendarTasks();
+            } else {
+                // Sidebar view: update parent task and all calendar instances
+                const parentTask = taskOrCalendarTask;
+                parentTask.activeSubtaskIndex = newIndex;
+                
+                // Update all calendar instances of this task
+                calendarTasks.forEach(ct => {
+                    if (ct.taskId === parentTask.id) {
+                        ct.activeSubtaskIndex = newIndex;
+                    }
+                });
+                
+                saveDataToSupabase();
+                renderTasks();
+                renderCalendarTasks();
+            }
         }
         
         // Setup quadrant drop zone for drag and drop within same section
@@ -2721,6 +3114,19 @@
                             </svg>
                         `;
                         
+                        // Get display name and check if task has subtasks
+                        const displayName = getCalendarTaskDisplayName(ct);
+                        const hasSubtasks = taskHasSubtasks(ct.taskId);
+                        
+                        // Subtask dropdown icon - only show if task has subtasks
+                        const subtaskDropdownHtml = hasSubtasks ? `
+                            <button class="subtask-dropdown-btn flex items-center justify-center hover:bg-gray-100 rounded flex-shrink-0 transition-all h-5 w-5" title="切换子任务" type="button">
+                                <svg class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                        ` : '';
+                        
                         // Resize handle - only show when single task in cell
                         const resizeHandleHtml = taskCount === 1 ? 
                             `<div class="resize-handle" style="position: absolute; bottom: 0; left: 0; right: 0; height: 4px; cursor: ns-resize; background: transparent;" title="拖拽调整时长"></div>` : '';
@@ -2737,7 +3143,8 @@
                                     <circle cx="10.5" cy="12" r="1" fill="#767676"/>
                                 </svg>
                             </div>
-                            <div class="flex-1 text-xs text-gray-800 truncate task-name ml-0.5">${escapeHtml(ct.name)}</div>
+                            <div class="flex-1 text-xs text-gray-800 truncate task-name ml-0.5">${escapeHtml(displayName)}</div>
+                            ${subtaskDropdownHtml}
                             <button class="check-button flex items-center justify-center hover:bg-green-50 rounded flex-shrink-0 transition-all h-5" title="${ct.completed ? '标记为未完成' : '标记为完成'}" type="button">
                                 ${checkIcon}
                             </button>
@@ -2781,14 +3188,14 @@
                                     }
                                 } else {
                                     // Start drag if moved
-                                    isDragging = true;
-                                    draggedCalendarTask = ct;
-                                    taskEl.style.opacity = '0.7';
-                                    taskEl.style.transform = 'scale(1.05)';
-                                    taskEl.style.zIndex = '100';
-                                    if (navigator.vibrate) {
+                                isDragging = true;
+                                draggedCalendarTask = ct;
+                                taskEl.style.opacity = '0.7';
+                                taskEl.style.transform = 'scale(1.05)';
+                                taskEl.style.zIndex = '100';
+                                if (navigator.vibrate) {
                                         navigator.vibrate(30);
-                                    }
+                                }
                                 }
                             }, 400);
                         });
@@ -2920,6 +3327,20 @@
                                 renderCalendarTasks();
                             }
                         });
+                        
+                        // Subtask dropdown button click handler
+                        const subtaskDropdownBtn = taskEl.querySelector('.subtask-dropdown-btn');
+                        if (subtaskDropdownBtn) {
+                            subtaskDropdownBtn.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                showSubtaskDropdown(ct, taskEl, 'calendar');
+                            });
+                            
+                            // Prevent drag when clicking subtask dropdown
+                            subtaskDropdownBtn.addEventListener('mousedown', (e) => {
+                                e.stopPropagation();
+                            });
+                        }
                         
                         // Check button click handler
                         const checkBtn = taskEl.querySelector('.check-button');
