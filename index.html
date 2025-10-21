@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.6.8">
+    <meta name="version" content="1.6.9">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -886,11 +886,11 @@
     </div>
     
     <!-- Clear Status Confirmation Modal -->
-    <div id="clearStatusModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+    <div id="clearStatusModal" class="fixed inset-0 bg-black bg-opacity-50 z-[200] hidden flex items-center justify-center">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
             <div class="px-6 py-5">
                 <h2 class="text-lg font-semibold text-black mb-2">清空已完成状态</h2>
-                <p class="text-sm text-gray-600 mb-4">确定要将所有已完成的任务恢复为未完成状态吗？此操作将把 <span id="completedTaskCount" class="font-semibold text-black">0</span> 个任务移回到"本周要务"。</p>
+                <p class="text-sm text-gray-600 mb-4">确定要清除日历上所有任务的完成标记吗？此操作将清除 <span id="completedTaskCount" class="font-semibold text-black">0</span> 个日历任务的 ✓ 标记，任务将恢复为可点击状态。</p>
                 <div class="flex gap-3">
                     <button onclick="closeClearStatusModal()" class="flex-1 border border-slate-200 text-slate-900 text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-50 transition-colors">
                         取消
@@ -996,10 +996,10 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.6.8 Loaded - Calendar Sync Fix');
-        console.log('✅ 优化：任务移出本周要务时自动删除日历实例');
-        console.log('✅ 优化：从thisweek移到planning或finished都会清空日历');
-        console.log('✅ 优化：显示提示消息告知用户有多少实例被移除');
+        console.log('Week Plan App - Version 1.6.9 Loaded - Clear Status Logic Fix');
+        console.log('✅ 修复："清空已完成状态"只清除日历checkmark，不移动任务');
+        console.log('✅ 修复：弹窗蒙层z-index提升到200，确保遮挡所有内容');
+        console.log('✅ 修复：页面加载时日历表头延迟显示，避免跳动');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -1120,13 +1120,13 @@
         
         // Clear Status Modal
         function showClearStatusConfirmation() {
-            const finishedTasks = tasks.filter(t => t.section === 'finished');
-            if (finishedTasks.length === 0) {
-                showToast('没有已完成的任务');
+            const completedCalendarTasks = calendarTasks.filter(ct => ct.completed);
+            if (completedCalendarTasks.length === 0) {
+                showToast('日历上没有已完成的任务');
                 return;
             }
             
-            document.getElementById('completedTaskCount').textContent = finishedTasks.length;
+            document.getElementById('completedTaskCount').textContent = completedCalendarTasks.length;
             document.getElementById('clearStatusModal').classList.remove('hidden');
         }
         
@@ -1135,24 +1135,24 @@
         }
         
         function clearAllCompletedStatus() {
-            const finishedTasks = tasks.filter(t => t.section === 'finished');
+            const completedCalendarTasks = calendarTasks.filter(ct => ct.completed);
             
-            if (finishedTasks.length === 0) {
+            if (completedCalendarTasks.length === 0) {
                 closeClearStatusModal();
                 return;
             }
             
-            // Move all finished tasks back to thisweek
-            finishedTasks.forEach(task => {
-                task.section = 'thisweek';
+            // Only clear the completed status from calendar tasks, don't move tasks
+            completedCalendarTasks.forEach(ct => {
+                ct.completed = false;
             });
             
-            const count = finishedTasks.length;
+            const count = completedCalendarTasks.length;
             
             saveDataToSupabase();
-            renderTasks();
+            renderCalendarTasks();
             closeClearStatusModal();
-            showToast(`已恢复 ${count} 个任务`);
+            showToast(`已清除 ${count} 个日历任务的完成状态`);
         }
         
         // Google OAuth Sign In
@@ -1518,13 +1518,19 @@
             // Then initialize week dates and time line
             initializeWeekDates();
             
-            // Show calendar headers after initialization
+            // Show calendar headers after initialization (wait for render to complete)
             setTimeout(() => {
                 const calendarHeader = document.getElementById('calendarHeader');
                 const weekDaysHeader = document.getElementById('weekDaysHeader');
-                if (calendarHeader) calendarHeader.style.opacity = '1';
-                if (weekDaysHeader) weekDaysHeader.style.opacity = '1';
-            }, 100);
+                if (calendarHeader) {
+                    calendarHeader.style.transition = 'opacity 0.3s ease';
+                    calendarHeader.style.opacity = '1';
+                }
+                if (weekDaysHeader) {
+                    weekDaysHeader.style.transition = 'opacity 0.3s ease';
+                    weekDaysHeader.style.opacity = '1';
+                }
+            }, 300);
             
             // Setup scroll listener for shadow effect
             const calendarContainer = document.querySelector('.calendar-container');
