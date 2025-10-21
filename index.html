@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.6.5">
+    <meta name="version" content="1.6.6">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -975,10 +975,10 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.6.5 Loaded - Subtask Icon Fix');
-        console.log('✅ 修复：本周要务和已完成section显示子任务下拉icon');
-        console.log('✅ 修复：所有section的任务都正确显示子任务功能');
-        console.log('✅ 优化：createSimpleTaskElement添加完整子任务支持');
+        console.log('Week Plan App - Version 1.6.6 Loaded - Duration Preserve Fix');
+        console.log('✅ 修复：拖动超过1小时的任务到新位置时保持原时长');
+        console.log('✅ 修复：桌面端和移动端拖动都不会丢失duration信息');
+        console.log('✅ 优化：只在两个任务共享单元格时才调整为30分钟');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -3005,10 +3005,8 @@
                     if (tasksInTargetCell.length === 1) {
                         tasksInTargetCell[0].duration = 30;
                         draggedCalendarTask.duration = 30;
-                    } else {
-                        // Moving to empty cell, restore to 60 minutes
-                        draggedCalendarTask.duration = 60;
                     }
+                    // Note: If moving to empty cell, keep the original duration (don't reset)
                 }
                 
                 saveDataToSupabase();
@@ -3250,10 +3248,8 @@
                                             if (tasksInTargetCell.length === 1) {
                                                 tasksInTargetCell[0].duration = 30;
                                                 draggedCalendarTask.duration = 30;
-                                            } else {
-                                                // Moving to empty cell, restore to 60 minutes
-                                                draggedCalendarTask.duration = 60;
                                             }
+                                            // Note: If moving to empty cell, keep the original duration (don't reset)
                                             
                                             saveDataToSupabase();
                                         }
