@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.6.2">
+    <meta name="version" content="1.6.3">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -500,36 +500,21 @@
                     </div>
                     
                     <!-- Subtasks Field -->
-                    <div class="flex flex-col gap-2">
+                    <div id="subtasksSection" class="flex flex-col gap-4 border-l border-[#dfe3e8] pl-4">
+                        <div id="subtasksList" class="flex flex-col gap-4">
+                            <!-- Subtasks will be rendered here -->
+                        </div>
                         <button 
                             type="button" 
-                            id="toggleSubtasksBtn"
-                            onclick="toggleSubtasksSection()"
-                            class="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
+                            id="addSubtaskBtn"
+                            onclick="addSubtask()"
+                            class="flex items-center gap-2 text-sm font-medium text-[#0d6bde] hover:text-[#0a5bc4] transition-colors self-start disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <svg id="subtasksChevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 4v16m8-8H4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
                             </svg>
                             <span>添加子任务</span>
-                            <span id="subtaskCount" class="text-xs text-gray-400"></span>
                         </button>
-                        
-                        <div id="subtasksSection" class="hidden flex flex-col gap-4 pl-4">
-                            <div id="subtasksList" class="flex flex-col gap-4">
-                                <!-- Subtasks will be rendered here -->
-                            </div>
-                            <button 
-                                type="button" 
-                                id="addSubtaskBtn"
-                                onclick="addSubtask()"
-                                class="flex items-center gap-2 text-sm font-medium text-[#0d6bde] hover:text-[#0a5bc4] transition-colors self-start"
-                            >
-                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 4v16m8-8H4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-                                </svg>
-                                <span>添加子任务</span>
-                            </button>
-                        </div>
                     </div>
                     
                     <!-- Save Button -->
@@ -990,10 +975,11 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.6.2 Loaded - Figma Design Match');
-        console.log('✅ 优化：子任务UI完全匹配Figma设计稿');
-        console.log('✅ 优化：删除按钮36x36px方框样式，带边框');
-        console.log('✅ 优化：间距、对齐、颜色完全按照设计稿');
+        console.log('Week Plan App - Version 1.6.3 Loaded - Subtasks Final Design');
+        console.log('✅ 优化：移除子任务展开/折叠标题，直接显示列表');
+        console.log('✅ 优化：左侧边框线包裹所有子任务');
+        console.log('✅ 优化：删除图标改为红色');
+        console.log('✅ 优化：超过8个子任务时禁用添加按钮');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -2037,24 +2023,6 @@
         // Subtask Management
         let tempSubtasks = []; // Temporary storage for subtasks during editing
         
-        function toggleSubtasksSection() {
-            const section = document.getElementById('subtasksSection');
-            const chevron = document.getElementById('subtasksChevron');
-            const isHidden = section.classList.contains('hidden');
-            
-            if (isHidden) {
-                section.classList.remove('hidden');
-                chevron.style.transform = 'rotate(90deg)';
-                // If no subtasks exist, add one
-                if (tempSubtasks.length === 0) {
-                    addSubtask();
-                }
-            } else {
-                section.classList.add('hidden');
-                chevron.style.transform = 'rotate(0deg)';
-            }
-        }
-        
         function addSubtask() {
             if (tempSubtasks.length >= 8) {
                 showToast('最多只能添加8个子任务');
@@ -2063,21 +2031,11 @@
             
             tempSubtasks.push({ name: '', id: Date.now().toString() });
             renderSubtasksList();
-            updateSubtaskCount();
         }
         
         function removeSubtask(subtaskId) {
             tempSubtasks = tempSubtasks.filter(st => st.id !== subtaskId);
             renderSubtasksList();
-            updateSubtaskCount();
-            
-            // If no subtasks remain, collapse the section
-            if (tempSubtasks.length === 0) {
-                const section = document.getElementById('subtasksSection');
-                const chevron = document.getElementById('subtasksChevron');
-                section.classList.add('hidden');
-                chevron.style.transform = 'rotate(0deg)';
-            }
         }
         
         function updateSubtaskName(subtaskId, name) {
@@ -2113,7 +2071,7 @@
                         class="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-white border border-[#dfe3e8] rounded hover:bg-red-50 transition-colors"
                         title="删除子任务"
                     >
-                        <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                     </button>
@@ -2121,51 +2079,25 @@
                 container.appendChild(subtaskEl);
             });
             
-            // Update add button visibility
+            // Update add button state
             const addBtn = document.getElementById('addSubtaskBtn');
             if (tempSubtasks.length >= 8) {
-                addBtn.classList.add('hidden');
+                addBtn.disabled = true;
             } else {
-                addBtn.classList.remove('hidden');
-            }
-        }
-        
-        function updateSubtaskCount() {
-            const countEl = document.getElementById('subtaskCount');
-            if (tempSubtasks.length > 0) {
-                countEl.textContent = `(${tempSubtasks.length}/8)`;
-            } else {
-                countEl.textContent = '';
+                addBtn.disabled = false;
             }
         }
         
         function loadSubtasksToForm(task) {
             tempSubtasks = task.subtasks ? [...task.subtasks] : [];
-            
-            if (tempSubtasks.length > 0) {
-                const section = document.getElementById('subtasksSection');
-                const chevron = document.getElementById('subtasksChevron');
-                section.classList.remove('hidden');
-                chevron.style.transform = 'rotate(90deg)';
-                renderSubtasksList();
-            } else {
-                const section = document.getElementById('subtasksSection');
-                const chevron = document.getElementById('subtasksChevron');
-                section.classList.add('hidden');
-                chevron.style.transform = 'rotate(0deg)';
-            }
-            
-            updateSubtaskCount();
+            renderSubtasksList();
         }
         
         function clearSubtasksForm() {
             tempSubtasks = [];
-            const section = document.getElementById('subtasksSection');
-            const chevron = document.getElementById('subtasksChevron');
-            section.classList.add('hidden');
-            chevron.style.transform = 'rotate(0deg)';
             document.getElementById('subtasksList').innerHTML = '';
-            updateSubtaskCount();
+            const addBtn = document.getElementById('addSubtaskBtn');
+            addBtn.disabled = false;
         }
         
         // Section Toggle - Only one section open at a time
