@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.6.7">
+    <meta name="version" content="1.6.8">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -996,10 +996,10 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.6.7 Loaded - Hover Button Fix');
-        console.log('✅ 优化：编辑和删除按钮hover时才显示，不占用默认空间');
-        console.log('✅ 优化：任务名称有更多显示空间，hover时才挤压');
-        console.log('✅ 优化：按钮淡入淡出动画更流畅');
+        console.log('Week Plan App - Version 1.6.8 Loaded - Calendar Sync Fix');
+        console.log('✅ 优化：任务移出本周要务时自动删除日历实例');
+        console.log('✅ 优化：从thisweek移到planning或finished都会清空日历');
+        console.log('✅ 优化：显示提示消息告知用户有多少实例被移除');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -2888,14 +2888,17 @@
                 if (task && task.section !== targetSection) {
                     const oldSection = task.section;
                     
-                    // Save calendar tasks for undo if moving to finished
+                    // Save calendar tasks for undo
                     const relatedCalendarTasks = calendarTasks.filter(ct => ct.taskId === task.id);
                     
                     task.section = targetSection;
                     
-                    // If moving to finished, remove from calendar
-                    if (targetSection === 'finished') {
+                    // If moving out of thisweek section, remove from calendar
+                    if (oldSection === 'thisweek' && targetSection !== 'thisweek') {
                         calendarTasks = calendarTasks.filter(ct => ct.taskId !== task.id);
+                        if (relatedCalendarTasks.length > 0) {
+                            showToast(`已从日历中移除该任务的 ${relatedCalendarTasks.length} 个实例`);
+                        }
                     }
                     
                     // Save for undo
