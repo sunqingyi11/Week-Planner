@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.6.9">
+    <meta name="version" content="1.7.0">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -731,7 +731,7 @@
         <div class="flex-1 flex flex-col calendar-container overflow-y-auto" style="background-color: #f7f9fa;">
             <div class="calendar-grid-wrapper px-8">
                 <!-- Calendar Header (Sticky) -->
-                <div id="calendarHeader" class="sticky top-0 z-[100] py-4 flex items-center justify-between pl-2 transition-shadow" style="background-color: #f7f9fa; opacity: 0;">
+                <div id="calendarHeader" class="sticky top-0 z-[100] py-4 flex items-center justify-between pl-2 transition-shadow" style="background-color: #f7f9fa; opacity: 0; visibility: hidden;">
                     <div class="flex items-center gap-2.5">
                     <!-- Expand Sidebar Button (only visible when sidebar is collapsed) -->
                         <button id="expandSidebarBtn" onclick="toggleSidebar()" class="calendar-header-toggle w-6 h-6 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-all hidden" title="展开侧边栏">
@@ -754,7 +754,7 @@
                 </div>
                 
                 <!-- Week Days Header (Sticky) with cover layer -->
-                <div id="weekDaysHeader" class="sticky z-[90] transition-shadow" style="top: 68px; opacity: 0;">
+                <div id="weekDaysHeader" class="sticky z-[90] transition-shadow" style="top: 68px; opacity: 0; visibility: hidden;">
                     <!-- Cover layer to prevent content from showing through -->
                     <div class="absolute inset-x-0 -top-10 h-10" style="background-color: #f7f9fa;"></div>
                     <div class="flex bg-white rounded-tl-3xl rounded-tr-3xl overflow-hidden relative">
@@ -996,10 +996,10 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.6.9 Loaded - Clear Status Logic Fix');
-        console.log('✅ 修复："清空已完成状态"只清除日历checkmark，不移动任务');
-        console.log('✅ 修复：弹窗蒙层z-index提升到200，确保遮挡所有内容');
-        console.log('✅ 修复：页面加载时日历表头延迟显示，避免跳动');
+        console.log('Week Plan App - Version 1.7.0 Loaded - Button and Loading Fix');
+        console.log('✅ 修复：清空按钮逻辑 - 基于日历完成任务数量显示/隐藏');
+        console.log('✅ 修复：渲染日历后自动更新按钮状态');
+        console.log('✅ 修复：使用visibility:hidden防止页面加载时表头闪现');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -1523,14 +1523,16 @@
                 const calendarHeader = document.getElementById('calendarHeader');
                 const weekDaysHeader = document.getElementById('weekDaysHeader');
                 if (calendarHeader) {
+                    calendarHeader.style.visibility = 'visible';
                     calendarHeader.style.transition = 'opacity 0.3s ease';
                     calendarHeader.style.opacity = '1';
                 }
                 if (weekDaysHeader) {
+                    weekDaysHeader.style.visibility = 'visible';
                     weekDaysHeader.style.transition = 'opacity 0.3s ease';
                     weekDaysHeader.style.opacity = '1';
                 }
-            }, 300);
+            }, 400);
             
             // Setup scroll listener for shadow effect
             const calendarContainer = document.querySelector('.calendar-container');
@@ -2218,8 +2220,8 @@
             updateAddButtonStyles('planning', planningSectionTasks.length);
             updateAddButtonStyles('thisweek', thisweekTasks.length);
             
-            // Update clear status button visibility
-            updateClearStatusButton(finishedTasks.length);
+            // Update clear status button visibility (based on calendar completed tasks)
+            updateClearStatusButton();
             
             // Render calendar tasks
             renderCalendarTasks();
@@ -3587,6 +3589,9 @@
                     });
                 }
             });
+            
+            // Update clear status button visibility after rendering
+            updateClearStatusButton();
         }
         
         // Select task and highlight it
@@ -3752,10 +3757,13 @@
         }
         
         // Update clear status button visibility
-        function updateClearStatusButton(finishedCount) {
+        function updateClearStatusButton() {
             const calendarBtn = document.getElementById('clearStatusBtnCalendar');
             
-            if (finishedCount > 0) {
+            // Count completed calendar tasks instead of finished section tasks
+            const completedCalendarCount = calendarTasks.filter(ct => ct.completed).length;
+            
+            if (completedCalendarCount > 0) {
                 if (calendarBtn) calendarBtn.classList.remove('hidden');
             } else {
                 if (calendarBtn) calendarBtn.classList.add('hidden');
