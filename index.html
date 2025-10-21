@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.6.3">
+    <meta name="version" content="1.6.4">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -975,11 +975,10 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.6.3 Loaded - Subtasks Final Design');
-        console.log('✅ 优化：移除子任务展开/折叠标题，直接显示列表');
-        console.log('✅ 优化：左侧边框线包裹所有子任务');
-        console.log('✅ 优化：删除图标改为红色');
-        console.log('✅ 优化：超过8个子任务时禁用添加按钮');
+        console.log('Week Plan App - Version 1.6.4 Loaded - UI Update Fixes');
+        console.log('✅ 修复：添加子任务后立即显示下拉icon');
+        console.log('✅ 修复：拖拽到日历后立即更新侧边栏UI样式');
+        console.log('✅ 优化：拖拽任务到日历时自动同步子任务索引');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -1982,12 +1981,16 @@
             }
             
             saveDataToSupabase();
-            renderTasks();
-            renderCalendarTasks();
             
-            if (showToastMessage) {
-            showToast(taskId ? '任务已更新' : '任务已创建');
-            }
+            // Use setTimeout to ensure DOM updates are processed
+            setTimeout(() => {
+                renderTasks();
+                renderCalendarTasks();
+                
+                if (showToastMessage) {
+                    showToast(taskId ? '任务已更新' : '任务已创建');
+                }
+            }, 0);
             
             return true;
         }
@@ -2931,8 +2934,15 @@
                     calendarTask.duration = 30;
                 }
                 
+                // Set activeSubtaskIndex if the parent task has subtasks
+                const parentTask = tasks.find(t => t.id === draggedTask.id);
+                if (parentTask && parentTask.subtasks && parentTask.subtasks.length > 0) {
+                    calendarTask.activeSubtaskIndex = parentTask.activeSubtaskIndex || 0;
+                }
+                
                 saveDataToSupabase();
                 renderCalendarTasks();
+                renderTasks(); // Update sidebar to show calendar icon and styling
             } else if (draggedCalendarTask) {
                 // Check if moving to a new cell
                 if (draggedCalendarTask.day !== day || 
