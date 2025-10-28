@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.8.2">
+    <meta name="version" content="1.8.3">
     <title>任务管理 - Week Plan</title>
     
     <!-- Critical inline styles for instant rendering - NO EXTERNAL DEPENDENCIES -->
@@ -1268,12 +1268,12 @@
         }, 500);
         
         // Version Check
-        console.log('Week Plan App - Version 1.8.2 - Drag Performance Fix');
-        console.log('🚀 重大修复：任务拖拽性能优化');
-        console.log('✅ 修复：防止事件监听器重复绑定');
-        console.log('✅ 修复：避免实时同步引起的双重渲染');
-        console.log('✅ 修复：拖拽残影和弹回问题');
-        console.log('✅ 优化：添加 50ms 延迟渲染，确保拖拽状态清除');
+        console.log('Week Plan App - Version 1.8.3 - Drag Event Binding Fix');
+        console.log('🚀 关键修复：彻底解决事件监听器重复绑定问题');
+        console.log('✅ 修复：使用 WeakSet 追踪已绑定元素（不受 innerHTML 影响）');
+        console.log('✅ 修复：第二次及后续拖拽不再弹回');
+        console.log('✅ 修复：任务重排序也添加延迟渲染和跳过标记');
+        console.log('✅ 优化：完善实时同步跳过机制');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -1292,6 +1292,10 @@
         let contextMenuTarget = null; // Track which task the context menu is for
         let longPressTimer = null; // Timer for long press detection
         let skipNextRealtimeUpdate = false; // Skip next real-time update to avoid double rendering
+        
+        // WeakSet to track elements with event listeners (survives DOM rebuilds)
+        const boundQuadrantDropZones = new WeakSet();
+        const boundTaskReorderingLists = new WeakSet();
         
         const colorMap = {
             'violet': 'bg-violet-500',
@@ -3042,11 +3046,11 @@
         function setupQuadrantDropZone(listElement) {
             if (!listElement) return;
             
-            // ✅ 防止重复绑定：检查是否已经设置过
-            if (listElement.dataset.quadrantDropZoneSetup === 'true') {
+            // ✅ 使用 WeakSet 防止重复绑定（不会因为 innerHTML 清空而丢失）
+            if (boundQuadrantDropZones.has(listElement)) {
                 return;
             }
-            listElement.dataset.quadrantDropZoneSetup = 'true';
+            boundQuadrantDropZones.add(listElement);
             
             const quadrantDiv = listElement.closest('[id^="quadrant-"]');
             if (!quadrantDiv) return;
@@ -3079,7 +3083,7 @@
                         const oldQuadrant = task.quadrant;
                         task.quadrant = quadrantName;
                         
-                        // ✅ 延迟渲染，避免与实时同步冲突
+                        // ✅ 标记跳过实时同步，避免双重渲染
                         skipNextRealtimeUpdate = true;
                         saveDataToSupabase();
                         
@@ -3096,6 +3100,12 @@
         // Setup task reordering within a list
         function setupTaskReordering(listElement, sectionName) {
             if (!listElement) return;
+            
+            // ✅ 使用 WeakSet 防止重复绑定
+            if (boundTaskReorderingLists.has(listElement)) {
+                return;
+            }
+            boundTaskReorderingLists.add(listElement);
             
             let draggedOverElement = null;
             
@@ -3139,9 +3149,15 @@
                     const otherTasks = tasks.filter(t => !(t.section === sectionName && t.quadrant === quadrantName));
                     tasks = [...otherTasks, ...sortedTasks];
                     
+                    // ✅ 标记跳过实时同步，避免双重渲染
+                    skipNextRealtimeUpdate = true;
                     saveDataToSupabase();
-                    renderTasks();
-                    showToast('任务顺序已更新');
+                    
+                    // 延迟渲染，确保拖拽状态已清除
+                    setTimeout(() => {
+                        renderTasks();
+                        showToast('任务顺序已更新');
+                    }, 50);
                 }
             });
         }
