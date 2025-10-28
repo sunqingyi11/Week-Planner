@@ -1282,6 +1282,91 @@
         // Initialize Supabase client (will be null until SDK loads)
         let supabase = null
         let currentUser = null
+        let authListenerSetup = false; // 防止重复设置认证监听器
+        
+        // Setup auth state listener (must be called after Supabase is initialized)
+        // ⚠️ 这个函数必须在 initializeSupabase 之前定义
+        function setupAuthListener() {
+            if (!supabase) {
+                console.warn('⚠️ Cannot setup auth listener: Supabase not initialized');
+                return;
+            }
+            
+            if (authListenerSetup) {
+                console.log('ℹ️ Auth listener already setup, skipping');
+                return;
+            }
+            
+            authListenerSetup = true;
+            console.log('🎧 Setting up auth state listener');
+            
+            supabase.auth.onAuthStateChange(async (event, session) => {
+                console.log('🔔 Auth state changed:', event)
+                console.log('Session:', session ? 'Active' : 'None')
+                console.log('User:', session?.user?.email || 'None')
+                
+                if (event === 'SIGNED_IN' && session?.user) {
+                    currentUser = session.user
+                    console.log('✅ User signed in:', currentUser.email)
+                    
+                    // ✅ 强制更新UI（确保侧边栏正确显示）
+                    updateUIForLoggedIn(session.user)
+                    
+                    // 加载数据并设置实时订阅
+                    await loadDataFromSupabase()
+                    setupRealtimeSubscription()
+                    
+                    // 渲染任务（确保UI同步）
+                    renderTasks()
+                    renderCalendarTasks()
+                    
+                    // 移除URL中的OAuth参数（清理URL）
+                    if (window.location.hash) {
+                        console.log('🧹 Cleaning OAuth hash from URL')
+                        window.history.replaceState({}, document.title, window.location.pathname)
+                    }
+                } else if (event === 'SIGNED_OUT') {
+                    console.log('👋 User signed out')
+                    // Cleanup real-time subscription
+                    if (realtimeChannel) {
+                        supabase.removeChannel(realtimeChannel);
+                        realtimeChannel = null;
+                    }
+                    currentUser = null
+                    updateUIForLoggedOut()
+                } else if (event === 'TOKEN_REFRESHED') {
+                    console.log('🔄 Token refreshed')
+                } else if (event === 'USER_UPDATED') {
+                    console.log('👤 User updated')
+                }
+            })
+            
+            // 检查初始会话（处理页面刷新或OAuth回调）
+            supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+                if (error) {
+                    console.error('❌ Error getting session:', error)
+                    return
+                }
+                
+                if (session?.user) {
+                    console.log('✅ Initial session found:', session.user.email)
+                    currentUser = session.user
+                    
+                    // ✅ 强制更新UI（确保侧边栏正确显示）
+                    updateUIForLoggedIn(session.user)
+                    
+                    await loadDataFromSupabase()
+                    setupRealtimeSubscription()
+                    
+                    // 渲染任务（确保UI同步）
+                    renderTasks()
+                    renderCalendarTasks()
+                } else {
+                    console.log('ℹ️ No initial session')
+                    updateUIForLoggedOut()
+                }
+            })
+        }
         
         // Initialize Supabase once SDK is loaded (exposed globally for SDK callback)
         window.initializeSupabase = function() {
@@ -1301,9 +1386,7 @@
                         console.log('✅ Supabase initialized successfully (session persistence enabled)')
                         
                         // ✅ 初始化完成后立即设置认证监听器
-                        if (typeof setupAuthListener === 'function') {
-                            setupAuthListener();
-                        }
+                        setupAuthListener();
                         
                         return true
                     } catch (error) {
@@ -1850,105 +1933,6 @@
                     console.log('Real-time subscription status:', status);
                 });
         }
-        
-        // Setup auth state listener (must be called after Supabase is initialized)
-        let authListenerSetup = false; // 防止重复设置
-        
-        function setupAuthListener() {
-            if (!supabase) {
-                console.warn('⚠️ Cannot setup auth listener: Supabase not initialized');
-                return;
-            }
-            
-            if (authListenerSetup) {
-                console.log('ℹ️ Auth listener already setup, skipping');
-                return;
-            }
-            
-            authListenerSetup = true;
-            console.log('🎧 Setting up auth state listener');
-            
-            supabase.auth.onAuthStateChange(async (event, session) => {
-                console.log('🔔 Auth state changed:', event)
-                console.log('Session:', session ? 'Active' : 'None')
-                console.log('User:', session?.user?.email || 'None')
-                
-                if (event === 'SIGNED_IN' && session?.user) {
-                    currentUser = session.user
-                    console.log('✅ User signed in:', currentUser.email)
-                    
-                    // ✅ 强制更新UI（确保侧边栏正确显示）
-                    updateUIForLoggedIn(session.user)
-                    
-                    // 加载数据并设置实时订阅
-                    await loadDataFromSupabase()
-                    setupRealtimeSubscription()
-                    
-                    // 渲染任务（确保UI同步）
-                    renderTasks()
-                    renderCalendarTasks()
-                    
-                    // 移除URL中的OAuth参数（清理URL）
-                    if (window.location.hash) {
-                        console.log('🧹 Cleaning OAuth hash from URL')
-                        window.history.replaceState({}, document.title, window.location.pathname)
-                    }
-                } else if (event === 'SIGNED_OUT') {
-                    console.log('👋 User signed out')
-                    // Cleanup real-time subscription
-                    if (realtimeChannel) {
-                        supabase.removeChannel(realtimeChannel);
-                        realtimeChannel = null;
-                    }
-                    currentUser = null
-                    updateUIForLoggedOut()
-                } else if (event === 'TOKEN_REFRESHED') {
-                    console.log('🔄 Token refreshed')
-                } else if (event === 'USER_UPDATED') {
-                    console.log('👤 User updated')
-                }
-            })
-            
-            // 检查初始会话（处理页面刷新或OAuth回调）
-            supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-                if (error) {
-                    console.error('❌ Error getting session:', error)
-                    return
-                }
-                
-                if (session?.user) {
-                    console.log('✅ Initial session found:', session.user.email)
-                    currentUser = session.user
-                    
-                    // ✅ 强制更新UI（确保侧边栏正确显示）
-                    updateUIForLoggedIn(session.user)
-                    
-                    await loadDataFromSupabase()
-                    setupRealtimeSubscription()
-                    
-                    // 渲染任务（确保UI同步）
-                    renderTasks()
-                    renderCalendarTasks()
-                } else {
-                    console.log('ℹ️ No initial session')
-                }
-            })
-        }
-        
-        // 延迟调用setupAuthListener，确保Supabase已初始化
-        setTimeout(() => {
-            if (supabase) {
-                setupAuthListener();
-            } else {
-                console.warn('⚠️ Supabase not ready, will retry auth listener setup');
-                // 再等一会儿重试
-                setTimeout(() => {
-                    if (supabase) {
-                        setupAuthListener();
-                    }
-                }, 1000);
-            }
-        }, 500);
         
         // =================================================================
         // INITIALIZE
