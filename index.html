@@ -3,15 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.7.4">
+    <meta name="version" content="1.8.0">
     <title>任务管理 - Week Plan</title>
     
-    <!-- Critical inline styles for instant rendering -->
+    <!-- Critical inline styles for instant rendering - NO EXTERNAL DEPENDENCIES -->
     <style>
-        /* Minimal critical CSS to prevent white screen */
+        /* Reset and base styles */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-        .loading-fallback { 
+        html, body { height: 100%; width: 100%; overflow-x: hidden; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: #f7f9fa;
+            color: #1e293b;
+        }
+        
+        /* Loading screen - critical for first paint */
+        .loading-fallback, #loadingScreen { 
             position: fixed; 
             inset: 0; 
             background: white; 
@@ -19,6 +26,7 @@
             align-items: center; 
             justify-content: center;
             z-index: 9999;
+            flex-direction: column;
         }
         .spinner { 
             border: 3px solid #f3f4f6; 
@@ -26,73 +34,128 @@
             border-radius: 50%; 
             width: 40px; 
             height: 40px; 
-            animation: spin 1s linear infinite; 
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Essential layout to prevent CLS */
+        .fixed { position: fixed; }
+        .absolute { position: absolute; }
+        .relative { position: relative; }
+        .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+        .flex { display: flex; }
+        .hidden { display: none !important; }
+        .items-center { align-items: center; }
+        .justify-center { justify-content: center; }
+        .gap-2 { gap: 0.5rem; }
+        .text-sm { font-size: 0.875rem; }
+        .text-xs { font-size: 0.75rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mt-8 { margin-top: 2rem; }
+        .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+        .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+        .rounded { border-radius: 0.25rem; }
+        .bg-white { background-color: white; }
+        .text-slate-600 { color: #475569; }
+        .text-slate-400 { color: #94a3b8; }
+        .text-slate-500 { color: #64748b; }
+        .text-blue-600 { color: #2563eb; }
+        .hover\:underline:hover { text-decoration: underline; }
+        .z-50 { z-index: 50; }
+        .max-w-md { max-width: 28rem; }
+        
+        /* Button styles */
+        button { 
+            cursor: pointer; 
+            border: none; 
+            background: none;
+            font-family: inherit;
+        }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* Prevent flash of unstyled content */
+        body:not(.tailwind-loaded) #app { opacity: 0; }
+        body.tailwind-loaded #app { opacity: 1; transition: opacity 0.3s; }
     </style>
     
-    <!-- Tailwind CSS - async load to prevent blocking -->
+    <!-- Tailwind CSS - async load with short timeout -->
     <script>
-        // Load Tailwind asynchronously with timeout
+        // Critical loading state
+        window.loadingState = { tailwind: false, supabase: false };
+        
+        // Load Tailwind asynchronously - page works without it!
         (function() {
             const script = document.createElement('script');
             script.src = 'https://cdn.tailwindcss.com';
             script.async = true;
             
-            // Timeout handler
+            // Short timeout - don't wait too long
             const timeout = setTimeout(() => {
-                console.warn('⚠️ Tailwind CSS loading timeout, continuing without it');
+                console.warn('⚠️ Tailwind CSS timeout - using fallback styles');
                 document.body.classList.add('tailwind-failed');
-            }, 8000);
+                document.body.classList.add('tailwind-loaded');
+                window.loadingState.tailwind = true;
+            }, 3000); // Reduced to 3 seconds
             
             script.onload = () => {
                 clearTimeout(timeout);
                 console.log('✅ Tailwind CSS loaded');
+                document.body.classList.add('tailwind-loaded');
+                window.loadingState.tailwind = true;
             };
             
             script.onerror = () => {
                 clearTimeout(timeout);
-                console.warn('⚠️ Tailwind CSS failed to load');
+                console.warn('⚠️ Tailwind CSS failed - using fallback styles');
                 document.body.classList.add('tailwind-failed');
+                document.body.classList.add('tailwind-loaded');
+                window.loadingState.tailwind = true;
             };
             
             document.head.appendChild(script);
         })();
     </script>
     
-    <!-- Supabase JS - async load with timeout -->
+    <!-- Supabase JS - async load with short timeout -->
     <script>
-        // Load Supabase asynchronously with timeout
+        // Load Supabase asynchronously - app works without it in offline mode!
         (function() {
             const script = document.createElement('script');
             script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
             script.async = true;
             
+            // Short timeout - fall back to offline mode quickly
             const timeout = setTimeout(() => {
-                console.warn('⚠️ Supabase SDK loading timeout');
+                console.warn('⚠️ Supabase SDK timeout - using offline mode');
                 window.supabaseLoadFailed = true;
-            }, 8000);
+                window.loadingState.supabase = true;
+            }, 3000); // Reduced to 3 seconds
             
             script.onload = () => {
                 clearTimeout(timeout);
                 console.log('✅ Supabase SDK loaded');
                 window.supabaseLoadFailed = false;
+                window.loadingState.supabase = true;
             };
             
             script.onerror = () => {
                 clearTimeout(timeout);
-                console.warn('⚠️ Supabase SDK failed to load');
+                console.warn('⚠️ Supabase SDK failed - using offline mode');
                 window.supabaseLoadFailed = true;
+                window.loadingState.supabase = true;
             };
             
             document.head.appendChild(script);
         })();
     </script>
+    
+    <!-- Inline styles - NO external fonts! -->
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
+        /* Use system fonts only - no external dependencies! */
         body {
-            font-family: 'Inter', 'PingFang SC', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
         }
         
         .dragging {
@@ -532,16 +595,16 @@
     </style>
 </head>
 <body class="bg-white">
-    <!-- Loading Screen -->
-    <div id="loadingScreen" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
-        <div class="text-center max-w-md px-6">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mx-auto mb-4"></div>
+    <!-- Minimal Loading Screen - instant display with no external dependencies -->
+    <div id="loadingScreen" class="loading-fallback">
+        <div style="text-align: center; max-width: 28rem; padding: 0 1.5rem;">
+            <div class="spinner"></div>
             <p id="loadingText" class="text-slate-600 text-sm mb-2">正在加载...</p>
             <div id="loadingProgress" class="text-xs text-slate-400"></div>
             
-            <!-- Subtle offline option (shown after 8s) -->
+            <!-- Offline option shown after 5s -->
             <div id="offlineHint" class="hidden mt-8 text-xs text-slate-500">
-                加载时间过长？<button onclick="startGuestMode()" class="text-blue-600 hover:underline ml-1">跳过，直接使用</button>
+                <button onclick="startGuestMode()" class="text-blue-600 hover:underline">点击跳过，直接使用</button>
             </div>
         </div>
     </div>
@@ -1101,15 +1164,15 @@
             }
         }
         
-        // Show offline hint after 8 seconds (only if still loading)
+        // Show offline hint after 5 seconds (only if still loading)
         setTimeout(() => {
             const offlineHint = document.getElementById('offlineHint');
             const loadingScreen = document.getElementById('loadingScreen');
             if (offlineHint && loadingScreen && loadingScreen.style.opacity !== '0') {
                 offlineHint.classList.remove('hidden');
-                console.log('ℹ️ Showing offline option after 8s timeout');
+                console.log('ℹ️ Showing offline option after 5s timeout');
             }
-        }, 8000);
+        }, 5000);
         
         // Start guest mode (called from loading screen button)
         function startGuestMode() {
@@ -1169,10 +1232,12 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.7.4 - Guest Mode & Fast Loading');
-        console.log('✅ 新增：游客模式支持多用户数据隔离');
-        console.log('✅ 优化：立即显示游客模式按钮（0秒等待）');
-        console.log('✅ 优化：3秒警告，8秒强调（原15秒）');
+        console.log('Week Plan App - Version 1.8.0 - Android Loading Fix');
+        console.log('🚀 重大修复：移除所有阻塞式外部资源');
+        console.log('✅ 移除：Google Fonts 同步加载（改用系统字体）');
+        console.log('✅ 优化：CDN 超时从 8秒 → 3秒');
+        console.log('✅ 优化：内联关键 CSS，确保立即渲染');
+        console.log('✅ 目标：Android 用户不再白屏！');
         console.log('✅ 修复：每个游客有独立的数据空间');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
