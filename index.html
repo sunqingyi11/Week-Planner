@@ -3453,7 +3453,8 @@
                         calendarTasks: relatedCalendarTasks.map(ct => ({...ct}))
                     };
                     
-                    saveDataToSupabase();
+                    // ✅ Section 间拖拽也是排序操作，启用5分钟冷却期
+                    saveDataToSupabase(true);
                     renderTasks();
                     renderCalendarTasks();
                     
@@ -3541,7 +3542,8 @@
                     calendarTask.activeSubtaskIndex = parentTask.activeSubtaskIndex || 0;
                 }
                 
-                saveDataToSupabase();
+                // ✅ 拖拽任务到日历，启用5分钟冷却期
+                saveDataToSupabase(true);
                 renderCalendarTasks();
                 renderTasks(); // Update sidebar to show calendar icon and styling
             } else if (draggedCalendarTask) {
@@ -3598,7 +3600,8 @@
                     // Note: If moving to empty cell, keep the original duration (don't reset)
                 }
                 
-                saveDataToSupabase();
+                // ✅ 在日历内移动任务，启用5分钟冷却期
+                saveDataToSupabase(true);
                 renderCalendarTasks();
             }
         }
@@ -3855,7 +3858,8 @@
                                                 tasksInTargetCell[0].duration = 30;
                                                 draggedCalendarTask.duration = 30;
                                                 
-                                            saveDataToSupabase();
+                                            // ✅ 日历拖拽操作，启用5分钟冷却期
+                                            saveDataToSupabase(true);
                                                 renderCalendarTasks();
                                                 showToast('已移动任务');
                                             }
@@ -3877,7 +3881,8 @@
                                             draggedCalendarTask.position = 0;
                                             // Keep the original duration (don't reset)
                                             
-                                            saveDataToSupabase();
+                                            // ✅ 日历拖拽操作，启用5分钟冷却期
+                                            saveDataToSupabase(true);
                                             renderCalendarTasks();
                                             showToast('已移动任务');
                                         }
@@ -3964,7 +3969,8 @@
                                 remaining[0].duration = 60;
                             }
                             
-                            saveDataToSupabase();
+                            // ✅ 从日历删除任务（拖拽操作），启用5分钟冷却期
+                            saveDataToSupabase(true);
                             renderCalendarTasks();
                             renderTasks(); // Re-render to update calendar icon status
                             showToast('已从日历移除');
@@ -4092,8 +4098,8 @@
                                     // Update task duration
                                     ct.duration = newDuration;
                                     
-                                    // Save and re-render
-                                    saveDataToSupabase();
+                                    // Save and re-render (拖拽调整时长，启用5分钟冷却期)
+                                    saveDataToSupabase(true);
                                     renderCalendarTasks();
                                     
                                     isResizing = false;
@@ -4174,7 +4180,8 @@
                                     draggedTask.position = targetTask.position;
                                     targetTask.position = tempPosition;
                                     
-                                    saveDataToSupabase();
+                                    // ✅ 交换日历任务位置，启用5分钟冷却期
+                                    saveDataToSupabase(true);
                                     renderCalendarTasks();
                                     showToast('已交换位置');
                                 }
@@ -4323,7 +4330,8 @@
                     remaining[0].duration = 60;
                 }
                 
-                saveDataToSupabase();
+                // ✅ 从日历删除任务（右键菜单），启用5分钟冷却期
+                saveDataToSupabase(true);
                 renderCalendarTasks();
                 renderTasks();
                 showToast('已从日历移除');
