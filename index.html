@@ -1750,9 +1750,11 @@
         
         // Save data to Supabase
         async function saveDataToSupabase() {
+            // ✅ 立即保存到本地存储（同步操作，确保数据不丢失）
+            saveTasksToStorage();
+            
             if (!supabase || !currentUser) {
-                console.log('⚠️ 未登录，保存到localStorage')
-                saveTasksToStorage() // Fallback to localStorage
+                console.log('⚠️ 未登录，使用localStorage')
                 return
             }
             
@@ -1776,9 +1778,6 @@
                 if (error) throw error
                 
                 console.log('✅ 保存成功')
-                
-                // Also save to localStorage as backup
-                saveTasksToStorage()
             } catch (error) {
                 console.error('❌ 保存失败:', error)
                 // Fallback to localStorage
@@ -3219,6 +3218,8 @@
                         
                         // ✅ 标记跳过实时同步，避免双重渲染
                         skipNextRealtimeUpdate = true;
+                        
+                        // ✅ 保存数据（会自动先保存到localStorage再保存到Supabase）
                         saveDataToSupabase();
                         
                         // 延迟渲染，确保拖拽状态已清除
@@ -3284,6 +3285,8 @@
                     
                     // ✅ 标记跳过实时同步，避免双重渲染
                     skipNextRealtimeUpdate = true;
+                    
+                    // ✅ 保存数据（会自动先保存到localStorage再保存到Supabase）
                     saveDataToSupabase();
                     
                     // 延迟渲染，确保拖拽状态已清除
