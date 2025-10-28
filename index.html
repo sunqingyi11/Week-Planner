@@ -3,12 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.7.2">
+    <meta name="version" content="1.7.4">
     <title>任务管理 - Week Plan</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Supabase JS -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Critical inline styles for instant rendering -->
+    <style>
+        /* Minimal critical CSS to prevent white screen */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+        .loading-fallback { 
+            position: fixed; 
+            inset: 0; 
+            background: white; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            z-index: 9999;
+        }
+        .spinner { 
+            border: 3px solid #f3f4f6; 
+            border-top: 3px solid #1e293b; 
+            border-radius: 50%; 
+            width: 40px; 
+            height: 40px; 
+            animation: spin 1s linear infinite; 
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+    
+    <!-- Tailwind CSS - async load to prevent blocking -->
+    <script>
+        // Load Tailwind asynchronously with timeout
+        (function() {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.tailwindcss.com';
+            script.async = true;
+            
+            // Timeout handler
+            const timeout = setTimeout(() => {
+                console.warn('⚠️ Tailwind CSS loading timeout, continuing without it');
+                document.body.classList.add('tailwind-failed');
+            }, 8000);
+            
+            script.onload = () => {
+                clearTimeout(timeout);
+                console.log('✅ Tailwind CSS loaded');
+            };
+            
+            script.onerror = () => {
+                clearTimeout(timeout);
+                console.warn('⚠️ Tailwind CSS failed to load');
+                document.body.classList.add('tailwind-failed');
+            };
+            
+            document.head.appendChild(script);
+        })();
+    </script>
+    
+    <!-- Supabase JS - async load with timeout -->
+    <script>
+        // Load Supabase asynchronously with timeout
+        (function() {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+            script.async = true;
+            
+            const timeout = setTimeout(() => {
+                console.warn('⚠️ Supabase SDK loading timeout');
+                window.supabaseLoadFailed = true;
+            }, 8000);
+            
+            script.onload = () => {
+                clearTimeout(timeout);
+                console.log('✅ Supabase SDK loaded');
+                window.supabaseLoadFailed = false;
+            };
+            
+            script.onerror = () => {
+                clearTimeout(timeout);
+                console.warn('⚠️ Supabase SDK failed to load');
+                window.supabaseLoadFailed = true;
+            };
+            
+            document.head.appendChild(script);
+        })();
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         
@@ -455,9 +534,15 @@
 <body class="bg-white">
     <!-- Loading Screen -->
     <div id="loadingScreen" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
-        <div class="text-center">
+        <div class="text-center max-w-md px-6">
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mx-auto mb-4"></div>
-            <p class="text-slate-600 text-sm">加载中...</p>
+            <p id="loadingText" class="text-slate-600 text-sm mb-2">正在加载...</p>
+            <div id="loadingProgress" class="text-xs text-slate-400"></div>
+            
+            <!-- Subtle offline option (shown after 8s) -->
+            <div id="offlineHint" class="hidden mt-8 text-xs text-slate-500">
+                加载时间过长？<button onclick="startGuestMode()" class="text-blue-600 hover:underline ml-1">跳过，直接使用</button>
+            </div>
         </div>
     </div>
     
@@ -575,8 +660,8 @@
                             <p class="text-sm text-gray-600">登录后可在多设备间同步您的任务</p>
                         </div>
                         <button onclick="showSignupModal()" class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-3 rounded-md hover:bg-slate-800 transition-colors">
-                            注册
-                        </button>
+                        注册
+                    </button>
                         <button onclick="showLoginModal()" class="w-full border border-slate-200 text-slate-900 text-sm font-medium px-4 py-3 rounded-md hover:bg-slate-50 transition-colors">
                             登录
                         </button>
@@ -593,12 +678,12 @@
                         <div class="flex items-center gap-2">
                             <button onclick="syncData()" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded transition-colors" title="同步数据">
                                 <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                            </button>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </button>
                             <button onclick="signOut()" class="bg-white text-red-600 text-sm font-medium px-3 py-1.5 rounded-md hover:bg-red-50 transition-colors">
-                                登出
-                            </button>
+                            登出
+                        </button>
                             <!-- Collapse Sidebar Button -->
                             <button onclick="toggleSidebar()" class="sidebar-collapse-btn w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-all" title="收起侧边栏">
                                 <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -983,9 +1068,86 @@
 
     <script>
         // =================================================================
-        // SUPABASE CONFIGURATIONss
+        // GUEST MODE & USER ISOLATION
         // =================================================================
-        // TODO: Replace these with your actual Supabase credentials
+        
+        let isGuestMode = false;
+        let currentGuestId = null;
+        
+        // Generate or retrieve guest ID for user isolation
+        function getOrCreateGuestId() {
+            let guestId = localStorage.getItem('week_planner_guest_id');
+            if (!guestId) {
+                guestId = 'guest_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('week_planner_guest_id', guestId);
+                console.log('✅ Created new guest ID:', guestId);
+            } else {
+                console.log('✅ Retrieved existing guest ID:', guestId);
+            }
+            return guestId;
+        }
+        
+        // Get storage key with user isolation (supports both logged-in users and guests)
+        function getStorageKey(key) {
+            if (currentUser) {
+                // Logged in user: use user ID
+                return `week_planner_${currentUser.id}_${key}`;
+            } else if (isGuestMode && currentGuestId) {
+                // Guest mode: use guest ID
+                return `week_planner_${currentGuestId}_${key}`;
+            } else {
+                // Fallback: no isolation (legacy)
+                return `week_planner_${key}`;
+            }
+        }
+        
+        // Show offline hint after 8 seconds (only if still loading)
+        setTimeout(() => {
+            const offlineHint = document.getElementById('offlineHint');
+            const loadingScreen = document.getElementById('loadingScreen');
+            if (offlineHint && loadingScreen && loadingScreen.style.opacity !== '0') {
+                offlineHint.classList.remove('hidden');
+                console.log('ℹ️ Showing offline option after 8s timeout');
+            }
+        }, 8000);
+        
+        // Start guest mode (called from loading screen button)
+        function startGuestMode() {
+            console.log('👤 Starting guest mode...');
+            isGuestMode = true;
+            
+            // Generate or retrieve guest ID
+            currentGuestId = getOrCreateGuestId();
+            
+            // Hide loading screen
+            const loadingScreen = document.getElementById('loadingScreen');
+            if (loadingScreen) {
+                loadingScreen.style.opacity = '0';
+                loadingScreen.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => loadingScreen.remove(), 300);
+            }
+            
+            // Load guest's data from localStorage
+            loadDataFromLocalStorage();
+            renderTasks();
+            
+            // Show logged out state with guest indicator
+            updateUIForLoggedOut();
+            
+            // Welcome message with guest ID
+            const guestNumber = currentGuestId.split('_')[1];
+            showToast(`👋 游客模式 (ID: ${guestNumber.substr(0, 6)})`, 3000);
+        }
+        
+        // Retry loading
+        function retryLoading() {
+            console.log('🔄 Retrying...');
+            location.reload();
+        }
+        
+        // =================================================================
+        // SUPABASE CONFIGURATION
+        // =================================================================
         const SUPABASE_URL = 'https://wzjxtzpxojbmhwxropio.supabase.co'
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6anh0enB4b2pibWh3eHJvcGlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwNjQ3ODgsImV4cCI6MjA3NTY0MDc4OH0.lImwPZn-ca-d4oVWpQ5FUtXdM_NBvdkplqh1hUk3stQ'
         
@@ -995,17 +1157,23 @@
         
         // Check if credentials are configured
         if (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE') {
+            try {
             supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
             console.log('✅ Supabase initialized')
+            } catch (error) {
+                console.warn('⚠️ Supabase initialization failed:', error);
+                console.warn('⚠️ Falling back to localStorage only.');
+            }
         } else {
             console.warn('⚠️ Supabase not configured. Using localStorage only.')
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.7.2 Loaded - Duration Check Logic');
-        console.log('✅ 修复：只允许1小时（60分钟）的任务合并到同一单元格');
-        console.log('✅ 修复：超过1小时的任务所在单元格无法拖入新任务');
-        console.log('✅ 新增：拖拽时检查双方任务时长，确保合并规则正确');
+        console.log('Week Plan App - Version 1.7.4 - Guest Mode & Fast Loading');
+        console.log('✅ 新增：游客模式支持多用户数据隔离');
+        console.log('✅ 优化：立即显示游客模式按钮（0秒等待）');
+        console.log('✅ 优化：3秒警告，8秒强调（原15秒）');
+        console.log('✅ 修复：每个游客有独立的数据空间');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
