@@ -1335,7 +1335,6 @@
         let selectedTaskId = null; // Track selected task for highlighting
         let contextMenuTarget = null; // Track which task the context menu is for
         let longPressTimer = null; // Timer for long press detection
-        let skipRealtimeUpdateCount = 0; // Count of real-time updates to skip (for multiple consecutive operations)
         
         // WeakSet to track elements with event listeners (survives DOM rebuilds)
         const boundQuadrantDropZones = new WeakSet();
@@ -1749,25 +1748,27 @@
         }
         
         // Save data to Supabase
-        async function saveDataToSupabase() {
+        // isReordering: 是否是拖拽排序操作（需要更长的冷却期）
+        async function saveDataToSupabase(isReordering = false) {
             // ✅ 立即保存到本地存储（同步操作，确保数据不丢失）
             saveTasksToStorage();
             
-            // ✅ 记录本地更新时间（用于防止实时同步覆盖）
-            localStorage.setItem('lastLocalUpdate', Date.now().toString());
+            // ✅ 记录本地保存时间和冷却期时长（冷却期内忽略实时推送，避免本地操作被覆盖）
+            // 拖拽排序：5分钟冷却期 | 其他操作：5秒冷却期
+            lastLocalSaveTime = Date.now();
+            currentCooldownPeriod = isReordering ? 300000 : 5000; // 5分钟 or 5秒
+            console.log(`⏰ 设置冷却期: ${isReordering ? '5分钟(拖拽排序)' : '5秒(常规操作)'}`);
             
             if (!supabase || !currentUser) {
                 console.log('⚠️ 未登录，使用localStorage')
                 return
             }
             
-            // ✅ 增加跳过计数（跳过接下来的实时同步更新）
-            skipRealtimeUpdateCount++;
-            
             try {
                 console.log('💾 保存到Supabase:', {
                     tasks: tasks.length,
-                    calendarTasks: calendarTasks.length
+                    calendarTasks: calendarTasks.length,
+                    type: isReordering ? '排序' : '常规'
                 })
                 
                 const { data, error } = await supabase
@@ -1807,6 +1808,8 @@
         
         // Setup real-time subscription for data sync
         let realtimeChannel = null;
+        let lastLocalSaveTime = 0; // 记录最后一次本地保存的时间
+        let currentCooldownPeriod = 5000; // 当前冷却期时长（ms）：拖拽=5分钟，其他=5秒
         
         function setupRealtimeSubscription() {
             if (!supabase || !currentUser) return;
@@ -1830,10 +1833,12 @@
                     (payload) => {
                         console.log('📡 Real-time update received:', payload);
                         
-                        // ✅ 跳过本地触发的更新，避免双重渲染
-                        if (skipRealtimeUpdateCount > 0) {
-                            skipRealtimeUpdateCount--;
-                            console.log(`⏩ Skipping real-time update (${skipRealtimeUpdateCount} remaining)`);
+                        // ✅ 检查是否在冷却期内（避免本地操作被远程数据覆盖）
+                        // 拖拽排序后5分钟内忽略 | 其他操作后5秒内忽略
+                        const timeSinceLastSave = Date.now() - lastLocalSaveTime;
+                        if (timeSinceLastSave < currentCooldownPeriod) {
+                            const remainingTime = Math.round((currentCooldownPeriod - timeSinceLastSave) / 1000);
+                            console.log(`⏩ Ignoring real-time update (${remainingTime}s cooldown remaining)`);
                             return;
                         }
                         
@@ -1841,20 +1846,11 @@
                         if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
                             const newData = payload.new;
                             if (newData && newData.user_id === currentUser.id) {
-                                // Check if the update is from a different session
-                                const localUpdateTime = localStorage.getItem('lastLocalUpdate');
-                                const remoteUpdateTime = new Date(newData.updated_at).getTime();
-                                
-                                // Only update if remote data is significantly newer (>500ms)
-                                if (!localUpdateTime || remoteUpdateTime > parseInt(localUpdateTime) + 500) {
-                                    console.log('✅ Applying real-time update from remote');
-                                    tasks = newData.tasks || [];
-                                    calendarTasks = newData.calendar_tasks || [];
-                                    renderTasks();
-                                    renderCalendarTasks();
-                                } else {
-                                    console.log('⏩ Ignoring real-time update (local data is newer)');
-                                }
+                                console.log('✅ Applying real-time update from remote device');
+                                tasks = newData.tasks || [];
+                                calendarTasks = newData.calendar_tasks || [];
+                                renderTasks();
+                                renderCalendarTasks();
                             }
                         }
                     }
@@ -3229,8 +3225,8 @@
                         const oldQuadrant = task.quadrant;
                         task.quadrant = quadrantName;
                         
-                        // ✅ 保存数据（会自动先保存到localStorage再保存到Supabase，并跳过实时同步）
-                        saveDataToSupabase();
+                        // ✅ 保存数据（拖拽排序操作，启用5分钟冷却期）
+                        saveDataToSupabase(true);
                         
                         // 延迟渲染，确保拖拽状态已清除
                         setTimeout(() => {
@@ -3293,8 +3289,8 @@
                     const otherTasks = tasks.filter(t => !(t.section === sectionName && t.quadrant === quadrantName));
                     tasks = [...otherTasks, ...sortedTasks];
                     
-                    // ✅ 保存数据（会自动先保存到localStorage再保存到Supabase，并跳过实时同步）
-                    saveDataToSupabase();
+                    // ✅ 保存数据（拖拽排序操作，启用5分钟冷却期）
+                    saveDataToSupabase(true);
                     
                     // 延迟渲染，确保拖拽状态已清除
                     setTimeout(() => {
