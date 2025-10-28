@@ -1288,8 +1288,23 @@
         if (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE') {
                 if (typeof window.supabase !== 'undefined') {
                     try {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-                        console.log('✅ Supabase initialized successfully')
+                        // ✅ 配置会话持久化和自动刷新（延长登录有效期）
+                        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                            auth: {
+                                persistSession: true,        // 持久化会话到localStorage
+                                autoRefreshToken: true,      // 自动刷新token
+                                detectSessionInUrl: true,    // 检测URL中的OAuth回调
+                                storage: window.localStorage, // 使用localStorage存储
+                                storageKey: 'supabase.auth.token' // 存储键名
+                            }
+                        })
+                        console.log('✅ Supabase initialized successfully (session persistence enabled)')
+                        
+                        // ✅ 初始化完成后立即设置认证监听器
+                        if (typeof setupAuthListener === 'function') {
+                            setupAuthListener();
+                        }
+                        
                         return true
                     } catch (error) {
                         console.warn('⚠️ Supabase initialization failed:', error);
@@ -1369,57 +1384,34 @@
         // =================================================================
         
         // Check authentication state on page load
+        // ⚠️ 注意：实际的认证和UI更新由setupAuthListener()处理
+        // 这个函数只负责确保Supabase初始化并加载本地数据作为后备
         async function checkAuthState() {
-            // ⚠️ 添加总超时保护，确保不会无限阻塞
-            const timeoutPromise = new Promise(resolve => {
-                setTimeout(() => {
-                    console.warn('⚠️ Auth check timeout after 2s, continuing with offline mode');
-                    resolve({ timeout: true });
-                }, 2000); // 2秒总超时
-            });
+            console.log('🔍 Checking initial auth state...');
             
-            const authCheckPromise = (async () => {
-                // Wait a bit for Supabase to initialize if not ready yet
-                if (!supabase && !window.supabaseLoadFailed) {
-                    console.log('⏳ Waiting for Supabase to initialize...')
-                    await new Promise(resolve => setTimeout(resolve, 500)) // 减少到500ms
-                    window.initializeSupabase() // Try again
-                }
-                
+            // Wait a bit for Supabase to initialize if not ready yet
+            if (!supabase && !window.supabaseLoadFailed) {
+                console.log('⏳ Waiting for Supabase to initialize...')
+                await new Promise(resolve => setTimeout(resolve, 500))
+                window.initializeSupabase() // Try again
+            }
+            
             if (!supabase) {
-                    // No Supabase configured or failed to load, stay logged out
-                    console.log('ℹ️ No Supabase available, using offline mode')
-                updateUIForLoggedOut()
-                    return { success: true }
-            }
-            
-            try {
-                const { data: { user } } = await supabase.auth.getUser()
-                if (user) {
-                    currentUser = user
-                    updateUIForLoggedIn(user)
-                    await loadDataFromSupabase()
-                } else {
-                    updateUIForLoggedOut()
-                    loadTasksFromStorage() // Fallback to localStorage
-                }
-                    return { success: true }
-            } catch (error) {
-                console.error('Auth check error:', error)
+                // No Supabase configured or failed to load, stay logged out
+                console.log('ℹ️ No Supabase available, using offline mode')
                 updateUIForLoggedOut()
                 loadTasksFromStorage()
-                    return { success: true }
-                }
-            })();
-            
-            // 使用 Promise.race 确保最多等待2秒
-            const result = await Promise.race([authCheckPromise, timeoutPromise]);
-            
-            if (result.timeout) {
-                // 超时了，强制使用离线模式
-                updateUIForLoggedOut()
-                loadTasksFromStorage()
+                renderTasks()
+                renderCalendarTasks()
+                return
             }
+            
+            // ✅ Supabase已初始化，setupAuthListener()会处理剩余的认证逻辑
+            // 这里只加载本地数据作为初始显示（避免空白）
+            console.log('✅ Supabase ready, auth listener will handle session');
+            loadTasksFromStorage() // Load local data first for quick display
+            renderTasks()
+            renderCalendarTasks()
         }
         
         // Update UI for logged in state
@@ -1630,10 +1622,9 @@
                 
                 if (error) throw error
                 
-                currentUser = data.user
-                updateUIForLoggedIn(data.user)
+                // ✅ 登录成功！onAuthStateChange 会自动处理 UI 更新和数据加载
+                console.log('✅ Email login successful, auth listener will update UI');
                 closeLoginModal()
-                await loadDataFromSupabase()
                 showToast('登录成功')
             } catch (error) {
                 console.error('Email sign in error:', error)
@@ -1860,9 +1851,24 @@
                 });
         }
         
-        // Listen for auth state changes
-        if (supabase) {
-            supabase.auth.onAuthStateChange((event, session) => {
+        // Setup auth state listener (must be called after Supabase is initialized)
+        let authListenerSetup = false; // 防止重复设置
+        
+        function setupAuthListener() {
+            if (!supabase) {
+                console.warn('⚠️ Cannot setup auth listener: Supabase not initialized');
+                return;
+            }
+            
+            if (authListenerSetup) {
+                console.log('ℹ️ Auth listener already setup, skipping');
+                return;
+            }
+            
+            authListenerSetup = true;
+            console.log('🎧 Setting up auth state listener');
+            
+            supabase.auth.onAuthStateChange(async (event, session) => {
                 console.log('🔔 Auth state changed:', event)
                 console.log('Session:', session ? 'Active' : 'None')
                 console.log('User:', session?.user?.email || 'None')
@@ -1870,9 +1876,17 @@
                 if (event === 'SIGNED_IN' && session?.user) {
                     currentUser = session.user
                     console.log('✅ User signed in:', currentUser.email)
+                    
+                    // ✅ 强制更新UI（确保侧边栏正确显示）
                     updateUIForLoggedIn(session.user)
-                    loadDataFromSupabase()
+                    
+                    // 加载数据并设置实时订阅
+                    await loadDataFromSupabase()
                     setupRealtimeSubscription()
+                    
+                    // 渲染任务（确保UI同步）
+                    renderTasks()
+                    renderCalendarTasks()
                     
                     // 移除URL中的OAuth参数（清理URL）
                     if (window.location.hash) {
@@ -1895,8 +1909,8 @@
                 }
             })
             
-            // 检查初始会话（处理OAuth回调）
-            supabase.auth.getSession().then(({ data: { session }, error }) => {
+            // 检查初始会话（处理页面刷新或OAuth回调）
+            supabase.auth.getSession().then(async ({ data: { session }, error }) => {
                 if (error) {
                     console.error('❌ Error getting session:', error)
                     return
@@ -1905,14 +1919,36 @@
                 if (session?.user) {
                     console.log('✅ Initial session found:', session.user.email)
                     currentUser = session.user
+                    
+                    // ✅ 强制更新UI（确保侧边栏正确显示）
                     updateUIForLoggedIn(session.user)
-                    loadDataFromSupabase()
+                    
+                    await loadDataFromSupabase()
                     setupRealtimeSubscription()
+                    
+                    // 渲染任务（确保UI同步）
+                    renderTasks()
+                    renderCalendarTasks()
                 } else {
                     console.log('ℹ️ No initial session')
                 }
             })
         }
+        
+        // 延迟调用setupAuthListener，确保Supabase已初始化
+        setTimeout(() => {
+            if (supabase) {
+                setupAuthListener();
+            } else {
+                console.warn('⚠️ Supabase not ready, will retry auth listener setup');
+                // 再等一会儿重试
+                setTimeout(() => {
+                    if (supabase) {
+                        setupAuthListener();
+                    }
+                }, 1000);
+            }
+        }, 500);
         
         // =================================================================
         // INITIALIZE
