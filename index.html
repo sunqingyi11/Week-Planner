@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.7.0">
+    <meta name="version" content="1.7.2">
     <title>任务管理 - Week Plan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -218,6 +218,12 @@
         /* Higher z-index when resizing to show above other elements */
         .calendar-task.resizing {
             z-index: 100;
+        }
+        
+        /* Lower z-index and disable pointer events for non-dragged tasks during drag */
+        .calendar-task.not-dragging {
+            z-index: 5;
+            pointer-events: none;
         }
         
         .calendar-task .close-button,
@@ -996,10 +1002,10 @@
         }
         
         // Version Check
-        console.log('Week Plan App - Version 1.7.0 Loaded - Button and Loading Fix');
-        console.log('✅ 修复：清空按钮逻辑 - 基于日历完成任务数量显示/隐藏');
-        console.log('✅ 修复：渲染日历后自动更新按钮状态');
-        console.log('✅ 修复：使用visibility:hidden防止页面加载时表头闪现');
+        console.log('Week Plan App - Version 1.7.2 Loaded - Duration Check Logic');
+        console.log('✅ 修复：只允许1小时（60分钟）的任务合并到同一单元格');
+        console.log('✅ 修复：超过1小时的任务所在单元格无法拖入新任务');
+        console.log('✅ 新增：拖拽时检查双方任务时长，确保合并规则正确');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -1825,6 +1831,15 @@
                 return;
             }
             
+            // If there's already one task, check if it's longer than 1 hour
+            if (tasksInCell.length === 1) {
+                const existingTask = tasksInCell[0];
+                if (existingTask.duration > 60) {
+                    showToast('该时间块已有超过1小时的任务，无法添加新任务');
+                    return;
+                }
+            }
+            
             // Store the calendar position for after task creation
             pendingCalendarPosition = {
                 day: day,
@@ -2013,11 +2028,11 @@
             
             // Use setTimeout to ensure DOM updates are processed
             setTimeout(() => {
-                renderTasks();
-                renderCalendarTasks();
+            renderTasks();
+            renderCalendarTasks();
                 
                 if (showToastMessage) {
-                    showToast(taskId ? '任务已更新' : '任务已创建');
+            showToast(taskId ? '任务已更新' : '任务已创建');
                 }
             }, 0);
             
@@ -2326,6 +2341,11 @@
                 div.classList.add('dragging');
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/plain', task.id);
+                
+                // Disable pointer events on all calendar tasks to allow drop on covered cells
+                document.querySelectorAll('.calendar-task').forEach(task => {
+                    task.classList.add('not-dragging');
+                });
             });
             
             div.addEventListener('dragend', (e) => {
@@ -2337,6 +2357,11 @@
                 });
                 document.querySelectorAll('.quadrant-drop-zone').forEach(zone => {
                     zone.classList.remove('drag-over-quadrant');
+                });
+                
+                // Re-enable pointer events on all calendar tasks
+                document.querySelectorAll('.calendar-task').forEach(task => {
+                    task.classList.remove('not-dragging');
                 });
             });
             
@@ -2963,9 +2988,19 @@
                     ct.day === day && ct.hour === hour
                 );
                 
+                // Check if cell is full
                 if (tasksInCell.length >= 2) {
                     showToast('每个时间块最多只能放置2个任务');
                     return;
+                }
+                
+                // If there's already one task, check if it's longer than 1 hour
+                if (tasksInCell.length === 1) {
+                    const existingTask = tasksInCell[0];
+                    if (existingTask.duration > 60) {
+                        showToast('该时间块已有超过1小时的任务，无法添加新任务');
+                        return;
+                    }
                 }
                 
                 // Create a copy of the task in the calendar
@@ -3016,6 +3051,17 @@
                         showToast('每个时间块最多只能放置2个任务');
                         renderCalendarTasks(); // Reset position
                         return;
+                    }
+                    
+                    // If there's already one task in target cell, check durations
+                    if (tasksInTargetCell.length === 1) {
+                        const existingTask = tasksInTargetCell[0];
+                        // Don't allow if existing task is > 1 hour OR dragged task is > 1 hour
+                        if (existingTask.duration > 60 || draggedCalendarTask.duration > 60) {
+                            showToast('无法合并：只有1小时的任务才能共享时间块');
+                            renderCalendarTasks(); // Reset position
+                            return;
+                        }
                     }
                     
                     // Get remaining tasks in the old cell
@@ -3161,11 +3207,23 @@
                             draggedCalendarTask = ct;
                             taskEl.style.opacity = '0.5';
                             e.dataTransfer.effectAllowed = 'move';
+                            
+                            // Disable pointer events on all other calendar tasks to allow drop on covered cells
+                            document.querySelectorAll('.calendar-task').forEach(task => {
+                                if (task !== taskEl) {
+                                    task.classList.add('not-dragging');
+                                }
+                            });
                         });
                         
                         taskEl.addEventListener('dragend', (e) => {
                             taskEl.style.opacity = '1';
                             draggedCalendarTask = null;
+                            
+                            // Re-enable pointer events on all calendar tasks
+                            document.querySelectorAll('.calendar-task').forEach(task => {
+                                task.classList.remove('not-dragging');
+                            });
                         });
                         
                         // Touch events for mobile drag support
@@ -3260,7 +3318,38 @@
                                         
                                         if (tasksInTargetCell.length >= 2) {
                                             showToast('每个时间块最多只能放置2个任务');
+                                        } else if (tasksInTargetCell.length === 1) {
+                                            // Check duration before allowing merge
+                                            const existingTask = tasksInTargetCell[0];
+                                            if (existingTask.duration > 60 || draggedCalendarTask.duration > 60) {
+                                                showToast('无法合并：只有1小时的任务才能共享时间块');
                                         } else {
+                                                // Allow merge - continue with existing logic
+                                                // Get remaining tasks in the old cell
+                                                const remainingInOldCell = calendarTasks.filter(t => 
+                                                    t.id !== draggedCalendarTask.id &&
+                                                    t.day === oldDay && t.hour === oldHour
+                                                );
+                                                
+                                                // If only one task remains in old cell, restore its duration
+                                                if (remainingInOldCell.length === 1) {
+                                                    remainingInOldCell[0].duration = 60;
+                                                }
+                                                
+                                            draggedCalendarTask.day = day;
+                                            draggedCalendarTask.hour = hour;
+                                            draggedCalendarTask.position = tasksInTargetCell.length;
+                                                
+                                                // If target cell now has 2 tasks, adjust durations to 30 minutes
+                                                tasksInTargetCell[0].duration = 30;
+                                                draggedCalendarTask.duration = 30;
+                                                
+                                            saveDataToSupabase();
+                                                renderCalendarTasks();
+                                                showToast('已移动任务');
+                                            }
+                                        } else {
+                                            // Moving to empty cell
                                             // Get remaining tasks in the old cell
                                             const remainingInOldCell = calendarTasks.filter(t => 
                                                 t.id !== draggedCalendarTask.id &&
@@ -3274,16 +3363,12 @@
                                             
                                             draggedCalendarTask.day = day;
                                             draggedCalendarTask.hour = hour;
-                                            draggedCalendarTask.position = tasksInTargetCell.length;
-                                            
-                                            // If target cell now has 2 tasks, adjust durations to 30 minutes
-                                            if (tasksInTargetCell.length === 1) {
-                                                tasksInTargetCell[0].duration = 30;
-                                                draggedCalendarTask.duration = 30;
-                                            }
-                                            // Note: If moving to empty cell, keep the original duration (don't reset)
+                                            draggedCalendarTask.position = 0;
+                                            // Keep the original duration (don't reset)
                                             
                                             saveDataToSupabase();
+                                            renderCalendarTasks();
+                                            showToast('已移动任务');
                                         }
                                     }
                                 }
