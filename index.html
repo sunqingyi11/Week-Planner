@@ -1335,7 +1335,7 @@
         let selectedTaskId = null; // Track selected task for highlighting
         let contextMenuTarget = null; // Track which task the context menu is for
         let longPressTimer = null; // Timer for long press detection
-        let skipNextRealtimeUpdate = false; // Skip next real-time update to avoid double rendering
+        let skipRealtimeUpdateCount = 0; // Count of real-time updates to skip (for multiple consecutive operations)
         
         // WeakSet to track elements with event listeners (survives DOM rebuilds)
         const boundQuadrantDropZones = new WeakSet();
@@ -1753,10 +1753,16 @@
             // ✅ 立即保存到本地存储（同步操作，确保数据不丢失）
             saveTasksToStorage();
             
+            // ✅ 记录本地更新时间（用于防止实时同步覆盖）
+            localStorage.setItem('lastLocalUpdate', Date.now().toString());
+            
             if (!supabase || !currentUser) {
                 console.log('⚠️ 未登录，使用localStorage')
                 return
             }
+            
+            // ✅ 增加跳过计数（跳过接下来的实时同步更新）
+            skipRealtimeUpdateCount++;
             
             try {
                 console.log('💾 保存到Supabase:', {
@@ -1825,23 +1831,30 @@
                         console.log('📡 Real-time update received:', payload);
                         
                         // ✅ 跳过本地触发的更新，避免双重渲染
-                        if (skipNextRealtimeUpdate) {
-                            // 延迟重置标志，确保本地渲染完成后再允许实时同步
-                            setTimeout(() => {
-                                skipNextRealtimeUpdate = false;
-                            }, 200); // 延迟200ms，比本地渲染的50ms更长
+                        if (skipRealtimeUpdateCount > 0) {
+                            skipRealtimeUpdateCount--;
+                            console.log(`⏩ Skipping real-time update (${skipRealtimeUpdateCount} remaining)`);
                             return;
                         }
                         
-                        // Reload data when changes detected
+                        // Reload data when changes detected from other devices/sessions
                         if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
                             const newData = payload.new;
                             if (newData && newData.user_id === currentUser.id) {
-                                tasks = newData.tasks || [];
-                                calendarTasks = newData.calendar_tasks || [];
-                                renderTasks();
-                                renderCalendarTasks();
-                                console.log('✅ UI updated from real-time sync');
+                                // Check if the update is from a different session
+                                const localUpdateTime = localStorage.getItem('lastLocalUpdate');
+                                const remoteUpdateTime = new Date(newData.updated_at).getTime();
+                                
+                                // Only update if remote data is significantly newer (>500ms)
+                                if (!localUpdateTime || remoteUpdateTime > parseInt(localUpdateTime) + 500) {
+                                    console.log('✅ Applying real-time update from remote');
+                                    tasks = newData.tasks || [];
+                                    calendarTasks = newData.calendar_tasks || [];
+                                    renderTasks();
+                                    renderCalendarTasks();
+                                } else {
+                                    console.log('⏩ Ignoring real-time update (local data is newer)');
+                                }
                             }
                         }
                     }
@@ -3216,10 +3229,7 @@
                         const oldQuadrant = task.quadrant;
                         task.quadrant = quadrantName;
                         
-                        // ✅ 标记跳过实时同步，避免双重渲染
-                        skipNextRealtimeUpdate = true;
-                        
-                        // ✅ 保存数据（会自动先保存到localStorage再保存到Supabase）
+                        // ✅ 保存数据（会自动先保存到localStorage再保存到Supabase，并跳过实时同步）
                         saveDataToSupabase();
                         
                         // 延迟渲染，确保拖拽状态已清除
@@ -3283,10 +3293,7 @@
                     const otherTasks = tasks.filter(t => !(t.section === sectionName && t.quadrant === quadrantName));
                     tasks = [...otherTasks, ...sortedTasks];
                     
-                    // ✅ 标记跳过实时同步，避免双重渲染
-                    skipNextRealtimeUpdate = true;
-                    
-                    // ✅ 保存数据（会自动先保存到localStorage再保存到Supabase）
+                    // ✅ 保存数据（会自动先保存到localStorage再保存到Supabase，并跳过实时同步）
                     saveDataToSupabase();
                     
                     // 延迟渲染，确保拖拽状态已清除
