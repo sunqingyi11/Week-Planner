@@ -196,14 +196,8 @@ ${info.warnings.map((w, i) => `   ${i+1}. ${w}`).join('\n')}
         body.tailwind-loaded #app { opacity: 1; transition: opacity 0.3s; }
     </style>
     
-    <!-- NO EXTERNAL CSS - All styles inlined below! -->
-    <script>
-        // Critical loading state
-        window.loadingState = { tailwind: true, supabase: false }; // Tailwind is now always "loaded" (inline)
-        console.log('✅ Using inline CSS - no external dependencies');
-        window.diagnosticInfo.cdnStatus.tailwind = '✅ 内联CSS（无需加载）';
-        window.logMilestone('✅ 内联CSS已就绪');
-    </script>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Supabase JS - async load with short timeout -->
     <script>
