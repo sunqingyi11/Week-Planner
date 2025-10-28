@@ -1287,6 +1287,10 @@
         // Setup auth state listener (must be called after Supabase is initialized)
         // ⚠️ 这个函数必须在 initializeSupabase 之前定义
         function setupAuthListener() {
+            console.log('🎯 setupAuthListener called');
+            console.log('  - supabase exists:', !!supabase);
+            console.log('  - authListenerSetup:', authListenerSetup);
+            
             if (!supabase) {
                 console.warn('⚠️ Cannot setup auth listener: Supabase not initialized');
                 return;
@@ -1299,6 +1303,7 @@
             
             authListenerSetup = true;
             console.log('🎧 Setting up auth state listener');
+            console.log('  - Registering onAuthStateChange...');
             
             supabase.auth.onAuthStateChange(async (event, session) => {
                 console.log('🔔 Auth state changed:', event)
@@ -1342,7 +1347,10 @@
             })
             
             // 检查初始会话（处理页面刷新或OAuth回调）
+            console.log('  - Checking initial session...');
             supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+                console.log('  - getSession() returned');
+                
                 if (error) {
                     console.error('❌ Error getting session:', error)
                     return
@@ -1350,29 +1358,54 @@
                 
                 if (session?.user) {
                     console.log('✅ Initial session found:', session.user.email)
+                    console.log('  - Session expires at:', new Date(session.expires_at * 1000).toLocaleString())
                     currentUser = session.user
                     
                     // ✅ 强制更新UI（确保侧边栏正确显示）
+                    console.log('  - Updating UI for logged in user...');
                     updateUIForLoggedIn(session.user)
                     
+                    console.log('  - Loading data from Supabase...');
                     await loadDataFromSupabase()
+                    
+                    console.log('  - Setting up realtime subscription...');
                     setupRealtimeSubscription()
                     
                     // 渲染任务（确保UI同步）
+                    console.log('  - Rendering tasks...');
                     renderTasks()
                     renderCalendarTasks()
+                    
+                    console.log('✅ Login restoration complete!');
                 } else {
-                    console.log('ℹ️ No initial session')
+                    console.log('ℹ️ No initial session found - user needs to log in')
                     updateUIForLoggedOut()
                 }
+            }).catch(err => {
+                console.error('❌ getSession() error:', err);
             })
         }
         
         // Initialize Supabase once SDK is loaded (exposed globally for SDK callback)
+        let supabaseInitialized = false; // 防止多次初始化
+        
         window.initializeSupabase = function() {
+            console.log('🔧 Attempting to initialize Supabase...');
+            console.log('  - Already initialized:', supabaseInitialized);
+            console.log('  - SDK available:', typeof window.supabase !== 'undefined');
+            console.log('  - Client exists:', !!supabase);
+            
+            // ✅ 防止重复初始化
+            if (supabaseInitialized) {
+                console.log('ℹ️ Supabase already initialized, skipping');
+                return true;
+            }
+            
         if (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE') {
                 if (typeof window.supabase !== 'undefined') {
                     try {
+                        console.log('🔨 Creating Supabase client...');
+                        
                         // ✅ 配置会话持久化和自动刷新（延长登录有效期）
                         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
                             auth: {
@@ -1383,10 +1416,14 @@
                                 storageKey: 'supabase.auth.token' // 存储键名
                             }
                         })
-                        console.log('✅ Supabase initialized successfully (session persistence enabled)')
+                        
+                        supabaseInitialized = true;
+                        console.log('✅ Supabase client created successfully');
                         
                         // ✅ 初始化完成后立即设置认证监听器
+                        console.log('📞 Calling setupAuthListener...');
                         setupAuthListener();
+                        console.log('✅ setupAuthListener called');
                         
                         return true
                     } catch (error) {
