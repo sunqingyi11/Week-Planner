@@ -3015,12 +3015,18 @@ ${info.warnings.map((w, i) => `   ${i+1}. ${w}`).join('\n')}
             });
             
             // ✅ Setup drag and drop for planning section to enable reordering
-            document.querySelectorAll('.planning-task-list').forEach(list => {
+            const planningLists = document.querySelectorAll('.planning-task-list');
+            console.log(`🔧 Setting up reordering for ${planningLists.length} planning lists`);
+            planningLists.forEach(list => {
+                console.log(`  → Planning list for quadrant: ${list.dataset.quadrant}`);
                 setupTaskReordering(list, 'planning');
             });
             
             // ✅ Setup drag and drop for thisweek section to enable reordering
-            document.querySelectorAll('.thisweek-task-list').forEach(list => {
+            const thisweekLists = document.querySelectorAll('.thisweek-task-list');
+            console.log(`🔧 Setting up reordering for ${thisweekLists.length} thisweek lists`);
+            thisweekLists.forEach(list => {
+                console.log(`  → Thisweek list for quadrant: ${list.dataset.quadrant}`);
                 setupTaskReordering(list, 'thisweek');
             });
             
@@ -3619,13 +3625,18 @@ ${info.warnings.map((w, i) => `   ${i+1}. ${w}`).join('\n')}
         
         // Setup task reordering within a list
         function setupTaskReordering(listElement, sectionName) {
-            if (!listElement) return;
+            if (!listElement) {
+                console.warn('⚠️ setupTaskReordering: listElement is null');
+                return;
+            }
             
             // ✅ 使用 WeakSet 防止重复绑定
             if (boundTaskReorderingLists.has(listElement)) {
+                console.log(`⏩ Skip: already bound for ${sectionName} (${listElement.dataset.quadrant})`);
                 return;
             }
             boundTaskReorderingLists.add(listElement);
+            console.log(`✅ Bound reordering for ${sectionName} (${listElement.dataset.quadrant})`);
             
             let draggedOverElement = null;
             
@@ -3646,14 +3657,22 @@ ${info.warnings.map((w, i) => `   ${i+1}. ${w}`).join('\n')}
             
             listElement.addEventListener('drop', (e) => {
                 e.preventDefault();
+                console.log(`📍 Drop event in ${sectionName}`);
                 
                 if (draggedTask && draggedTask.section === sectionName) {
                     // ✅ 从 listElement 获取 quadrant（适配 planning 和 thisweek）
                     const quadrantName = listElement.dataset.quadrant;
-                    if (!quadrantName) return;
+                    console.log(`  → Quadrant: ${quadrantName}`);
+                    console.log(`  → Task: ${draggedTask.name}, from quadrant: ${draggedTask.quadrant}`);
+                    
+                    if (!quadrantName) {
+                        console.warn('⚠️ No quadrant name found on listElement');
+                        return;
+                    }
                     
                     const taskElements = Array.from(listElement.children);
                     const newOrder = taskElements.map(el => el.dataset.taskId);
+                    console.log(`  → New order:`, newOrder);
                     
                     // Reorder tasks array based on new order
                     const quadrantTasks = tasks.filter(t => t.section === sectionName && t.quadrant === quadrantName);
@@ -3671,12 +3690,15 @@ ${info.warnings.map((w, i) => `   ${i+1}. ${w}`).join('\n')}
                     // ✅ 标记跳过实时同步，避免双重渲染
                     skipNextRealtimeUpdate = true;
                     saveDataToSupabase();
+                    console.log(`💾 Saved to Supabase, will render in 100ms`);
                     
                     // 延迟渲染，确保拖拽状态已清除
                     setTimeout(() => {
                         renderTasks();
                         showToast('任务顺序已更新');
                     }, 100); // 增加到100ms确保拖拽状态完全清除
+                } else {
+                    console.log(`⏩ Skip: draggedTask.section (${draggedTask?.section}) !== ${sectionName}`);
                 }
             });
         }
