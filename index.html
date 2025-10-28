@@ -158,7 +158,6 @@
             const timeout = setTimeout(() => {
                 console.warn('⚠️ Supabase SDK timeout - using offline mode');
                 window.supabaseLoadFailed = true;
-                window.loadingState.supabase = true;
             }, 3000); // Reduced to 3 seconds
             
             script.onload = () => {
@@ -167,12 +166,17 @@
                 window.diagnosticInfo.cdnStatus.supabase = '✅ 加载成功';
                 window.logMilestone('✅ Supabase SDK 加载成功');
                 window.supabaseLoadFailed = false;
-                window.loadingState.supabase = true;
                 
-                // Initialize Supabase client immediately after SDK loads
-                if (typeof window.initializeSupabase === 'function') {
-                    window.initializeSupabase();
-                }
+                // ✅ Initialize Supabase client immediately after SDK loads
+                // Use setTimeout to ensure function is defined (it's in <body>)
+                setTimeout(() => {
+                    if (typeof window.initializeSupabase === 'function') {
+                        console.log('📞 SDK loaded, calling initializeSupabase...');
+                        window.initializeSupabase();
+                    } else {
+                        console.warn('⚠️ window.initializeSupabase not defined yet, will retry later');
+                    }
+                }, 100);
             };
             
             script.onerror = () => {
@@ -182,7 +186,6 @@
                 window.diagnosticInfo.warnings.push('Supabase SDK 加载失败，使用离线模式');
                 window.logMilestone('❌ Supabase SDK 加载失败');
                 window.supabaseLoadFailed = true;
-                window.loadingState.supabase = true;
             };
             
             document.head.appendChild(script);
