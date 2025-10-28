@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.8.1">
+    <meta name="version" content="1.8.2">
     <title>任务管理 - Week Plan</title>
     
     <!-- Critical inline styles for instant rendering - NO EXTERNAL DEPENDENCIES -->
@@ -1268,12 +1268,12 @@
         }, 500);
         
         // Version Check
-        console.log('Week Plan App - Version 1.8.1 - Supabase Loading Fix');
-        console.log('🔧 关键修复：Supabase 异步初始化');
-        console.log('✅ 修复：等待 Supabase SDK 加载完成后再初始化');
-        console.log('✅ 修复："请先配置 Supabase 凭据" 错误提示');
-        console.log('✅ 保留：Google Fonts 移除 + CDN 超时优化');
-        console.log('✅ 保留：Android 白屏修复');
+        console.log('Week Plan App - Version 1.8.2 - Drag Performance Fix');
+        console.log('🚀 重大修复：任务拖拽性能优化');
+        console.log('✅ 修复：防止事件监听器重复绑定');
+        console.log('✅ 修复：避免实时同步引起的双重渲染');
+        console.log('✅ 修复：拖拽残影和弹回问题');
+        console.log('✅ 优化：添加 50ms 延迟渲染，确保拖拽状态清除');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -1291,6 +1291,7 @@
         let selectedTaskId = null; // Track selected task for highlighting
         let contextMenuTarget = null; // Track which task the context menu is for
         let longPressTimer = null; // Timer for long press detection
+        let skipNextRealtimeUpdate = false; // Skip next real-time update to avoid double rendering
         
         const colorMap = {
             'violet': 'bg-violet-500',
@@ -1716,6 +1717,13 @@
                     },
                     (payload) => {
                         console.log('📡 Real-time update received:', payload);
+                        
+                        // ✅ 跳过本地触发的更新，避免双重渲染
+                        if (skipNextRealtimeUpdate) {
+                            console.log('⏩ Skipping real-time update (local change)');
+                            skipNextRealtimeUpdate = false;
+                            return;
+                        }
                         
                         // Reload data when changes detected
                         if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
@@ -3034,6 +3042,12 @@
         function setupQuadrantDropZone(listElement) {
             if (!listElement) return;
             
+            // ✅ 防止重复绑定：检查是否已经设置过
+            if (listElement.dataset.quadrantDropZoneSetup === 'true') {
+                return;
+            }
+            listElement.dataset.quadrantDropZoneSetup = 'true';
+            
             const quadrantDiv = listElement.closest('[id^="quadrant-"]');
             if (!quadrantDiv) return;
             
@@ -3065,9 +3079,15 @@
                         const oldQuadrant = task.quadrant;
                         task.quadrant = quadrantName;
                         
+                        // ✅ 延迟渲染，避免与实时同步冲突
+                        skipNextRealtimeUpdate = true;
                         saveDataToSupabase();
-                        renderTasks();
-                        showToast(`任务已移至"${quadrantName}"`);
+                        
+                        // 延迟渲染，确保拖拽状态已清除
+                        setTimeout(() => {
+                            renderTasks();
+                            showToast(`任务已移至"${quadrantName}"`);
+                        }, 50);
                     }
                 }
             });
