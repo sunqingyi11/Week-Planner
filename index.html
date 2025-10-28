@@ -39,76 +39,6 @@
         });
         
         window.logMilestone('🎬 页面开始加载');
-        
-        // 添加诊断按钮到页面（在控制台输入 showDiag() 或点击按钮）
-        window.showDiag = function() {
-            const info = window.diagnosticInfo;
-            const elapsed = Date.now() - info.loadStart;
-            
-            let report = `
-╔════════════════════════════════════════════════════════════╗
-║        📊 诊断报告 - Week Plan v${info.version}        ║
-╚════════════════════════════════════════════════════════════╝
-
-⏱️  总加载时间: ${elapsed}ms
-
-🌐 浏览器信息:
-   User Agent: ${navigator.userAgent}
-   在线状态: ${navigator.onLine ? '✅ 在线' : '❌ 离线'}
-   语言: ${navigator.language}
-   视口: ${window.innerWidth}x${window.innerHeight}
-
-📦 CDN 状态:
-   Tailwind CSS: ${info.cdnStatus.tailwind}
-   Supabase SDK: ${info.cdnStatus.supabase}
-
-📍 页面状态:
-   DOM Ready: ${info.domReady ? '✅' : '❌'}
-   Loading Screen 已隐藏: ${info.loadingScreenHidden ? '✅' : '❌'}
-
-⏲️ 加载里程碑 (${info.milestones.length}个):
-${info.milestones.map(m => `   [${String(m.time).padStart(6)}ms] ${m.message}`).join('\n')}
-
-${info.errors.length > 0 ? `
-❌ 错误列表 (${info.errors.length}个):
-${info.errors.map((e, i) => `   ${i+1}. ${e}`).join('\n')}
-` : '✅ 无JavaScript错误'}
-
-${info.warnings.length > 0 ? `
-⚠️  警告列表 (${info.warnings.length}个):
-${info.warnings.map((w, i) => `   ${i+1}. ${w}`).join('\n')}
-` : '✅ 无警告'}
-
-═══════════════════════════════════════════════════════════
-💡 请复制此完整报告并发送给开发者
-═══════════════════════════════════════════════════════════
-`;
-            console.log(report);
-            
-            // 创建可复制的文本框
-            const pre = document.createElement('pre');
-            pre.style.cssText = 'position:fixed;top:10%;left:10%;right:10%;bottom:10%;background:white;border:3px solid #333;padding:20px;overflow:auto;z-index:999999;font-family:monospace;font-size:12px;';
-            pre.textContent = report;
-            
-            const closeBtn = document.createElement('button');
-            closeBtn.textContent = '关闭';
-            closeBtn.style.cssText = 'position:absolute;top:10px;right:10px;padding:5px 15px;background:#f44336;color:white;border:none;border-radius:4px;cursor:pointer;';
-            closeBtn.onclick = () => pre.remove();
-            
-            const copyBtn = document.createElement('button');
-            copyBtn.textContent = '复制报告';
-            copyBtn.style.cssText = 'position:absolute;top:10px;right:80px;padding:5px 15px;background:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;';
-            copyBtn.onclick = () => {
-                navigator.clipboard.writeText(report).then(() => {
-                    copyBtn.textContent = '✅ 已复制！';
-                    setTimeout(() => copyBtn.textContent = '复制报告', 2000);
-                });
-            };
-            
-            pre.appendChild(closeBtn);
-            pre.appendChild(copyBtn);
-            document.body.appendChild(pre);
-        };
     </script>
     
     <!-- Critical inline styles for instant rendering - NO EXTERNAL DEPENDENCIES -->
@@ -1311,11 +1241,7 @@ ${info.warnings.map((w, i) => `   ${i+1}. ${w}`).join('\n')}
                     renderCalendarTasks();
                 }
             }
-            // 自动显示诊断信息（如果还有问题）
-            // Diagnostic report available in console via window.showDiag() if needed
-            if (window.diagnosticInfo.errors.length > 0) {
-                console.warn('⚠️ 检测到加载问题，如需诊断请在控制台输入: window.showDiag()');
-            }
+            // Silent error tracking for internal use only
         }, 8000);
         
         // Start guest mode (called from loading screen button)
