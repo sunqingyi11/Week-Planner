@@ -3,10 +3,113 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="1.8.4">
+    <meta name="version" content="1.10.0">
     <title>任务管理 - Week Plan</title>
     <!-- 添加 favicon 避免 404 错误 -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>">
+    
+    <!-- 🔧 全局诊断工具 - 最先初始化 -->
+    <script>
+        window.diagnosticInfo = {
+            version: '1.9.0',
+            loadStart: Date.now(),
+            cdnStatus: { tailwind: '⏳ 加载中...', supabase: '⏳ 加载中...' },
+            errors: [],
+            warnings: [],
+            milestones: [],
+            domReady: false,
+            loadingScreenHidden: false
+        };
+        
+        window.logMilestone = function(message) {
+            const elapsed = Date.now() - window.diagnosticInfo.loadStart;
+            window.diagnosticInfo.milestones.push({ time: elapsed, message });
+            console.log(`[${elapsed}ms] ${message}`);
+        };
+        
+        // 全局错误捕获
+        window.addEventListener('error', function(e) {
+            window.diagnosticInfo.errors.push(`${e.message} at ${e.filename}:${e.lineno}`);
+            console.error('❌ 捕获错误:', e.message);
+        });
+        
+        window.addEventListener('unhandledrejection', function(e) {
+            window.diagnosticInfo.errors.push(`Promise rejection: ${e.reason}`);
+            console.error('❌ Promise rejection:', e.reason);
+        });
+        
+        window.logMilestone('🎬 页面开始加载');
+        
+        // 添加诊断按钮到页面（在控制台输入 showDiag() 或点击按钮）
+        window.showDiag = function() {
+            const info = window.diagnosticInfo;
+            const elapsed = Date.now() - info.loadStart;
+            
+            let report = `
+╔════════════════════════════════════════════════════════════╗
+║        📊 诊断报告 - Week Plan v${info.version}        ║
+╚════════════════════════════════════════════════════════════╝
+
+⏱️  总加载时间: ${elapsed}ms
+
+🌐 浏览器信息:
+   User Agent: ${navigator.userAgent}
+   在线状态: ${navigator.onLine ? '✅ 在线' : '❌ 离线'}
+   语言: ${navigator.language}
+   视口: ${window.innerWidth}x${window.innerHeight}
+
+📦 CDN 状态:
+   Tailwind CSS: ${info.cdnStatus.tailwind}
+   Supabase SDK: ${info.cdnStatus.supabase}
+
+📍 页面状态:
+   DOM Ready: ${info.domReady ? '✅' : '❌'}
+   Loading Screen 已隐藏: ${info.loadingScreenHidden ? '✅' : '❌'}
+
+⏲️ 加载里程碑 (${info.milestones.length}个):
+${info.milestones.map(m => `   [${String(m.time).padStart(6)}ms] ${m.message}`).join('\n')}
+
+${info.errors.length > 0 ? `
+❌ 错误列表 (${info.errors.length}个):
+${info.errors.map((e, i) => `   ${i+1}. ${e}`).join('\n')}
+` : '✅ 无JavaScript错误'}
+
+${info.warnings.length > 0 ? `
+⚠️  警告列表 (${info.warnings.length}个):
+${info.warnings.map((w, i) => `   ${i+1}. ${w}`).join('\n')}
+` : '✅ 无警告'}
+
+═══════════════════════════════════════════════════════════
+💡 请复制此完整报告并发送给开发者
+═══════════════════════════════════════════════════════════
+`;
+            console.log(report);
+            
+            // 创建可复制的文本框
+            const pre = document.createElement('pre');
+            pre.style.cssText = 'position:fixed;top:10%;left:10%;right:10%;bottom:10%;background:white;border:3px solid #333;padding:20px;overflow:auto;z-index:999999;font-family:monospace;font-size:12px;';
+            pre.textContent = report;
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '关闭';
+            closeBtn.style.cssText = 'position:absolute;top:10px;right:10px;padding:5px 15px;background:#f44336;color:white;border:none;border-radius:4px;cursor:pointer;';
+            closeBtn.onclick = () => pre.remove();
+            
+            const copyBtn = document.createElement('button');
+            copyBtn.textContent = '复制报告';
+            copyBtn.style.cssText = 'position:absolute;top:10px;right:80px;padding:5px 15px;background:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;';
+            copyBtn.onclick = () => {
+                navigator.clipboard.writeText(report).then(() => {
+                    copyBtn.textContent = '✅ 已复制！';
+                    setTimeout(() => copyBtn.textContent = '复制报告', 2000);
+                });
+            };
+            
+            pre.appendChild(closeBtn);
+            pre.appendChild(copyBtn);
+            document.body.appendChild(pre);
+        };
+    </script>
     
     <!-- Critical inline styles for instant rendering - NO EXTERNAL DEPENDENCIES -->
     <style>
@@ -93,42 +196,13 @@
         body.tailwind-loaded #app { opacity: 1; transition: opacity 0.3s; }
     </style>
     
-    <!-- Tailwind CSS - async load with short timeout -->
+    <!-- NO EXTERNAL CSS - All styles inlined below! -->
     <script>
         // Critical loading state
-        window.loadingState = { tailwind: false, supabase: false };
-        
-        // Load Tailwind asynchronously - page works without it!
-        (function() {
-            const script = document.createElement('script');
-            script.src = 'https://cdn.tailwindcss.com';
-            script.async = true;
-            
-            // Short timeout - don't wait too long
-            const timeout = setTimeout(() => {
-                console.warn('⚠️ Tailwind CSS timeout - using fallback styles');
-                document.body.classList.add('tailwind-failed');
-                document.body.classList.add('tailwind-loaded');
-                window.loadingState.tailwind = true;
-            }, 3000); // Reduced to 3 seconds
-            
-            script.onload = () => {
-                clearTimeout(timeout);
-                console.log('✅ Tailwind CSS loaded');
-                document.body.classList.add('tailwind-loaded');
-                window.loadingState.tailwind = true;
-            };
-            
-            script.onerror = () => {
-                clearTimeout(timeout);
-                console.warn('⚠️ Tailwind CSS failed - using fallback styles');
-                document.body.classList.add('tailwind-failed');
-                document.body.classList.add('tailwind-loaded');
-                window.loadingState.tailwind = true;
-            };
-            
-            document.head.appendChild(script);
-        })();
+        window.loadingState = { tailwind: true, supabase: false }; // Tailwind is now always "loaded" (inline)
+        console.log('✅ Using inline CSS - no external dependencies');
+        window.diagnosticInfo.cdnStatus.tailwind = '✅ 内联CSS（无需加载）';
+        window.logMilestone('✅ 内联CSS已就绪');
     </script>
     
     <!-- Supabase JS - async load with short timeout -->
@@ -149,6 +223,8 @@
             script.onload = () => {
                 clearTimeout(timeout);
                 console.log('✅ Supabase SDK loaded');
+                window.diagnosticInfo.cdnStatus.supabase = '✅ 加载成功';
+                window.logMilestone('✅ Supabase SDK 加载成功');
                 window.supabaseLoadFailed = false;
                 window.loadingState.supabase = true;
                 
@@ -161,6 +237,9 @@
             script.onerror = () => {
                 clearTimeout(timeout);
                 console.warn('⚠️ Supabase SDK failed - using offline mode');
+                window.diagnosticInfo.cdnStatus.supabase = '❌ 加载失败';
+                window.diagnosticInfo.warnings.push('Supabase SDK 加载失败，使用离线模式');
+                window.logMilestone('❌ Supabase SDK 加载失败');
                 window.supabaseLoadFailed = true;
                 window.loadingState.supabase = true;
             };
@@ -610,6 +689,350 @@
         .context-menu-item:last-child {
             border-radius: 0 0 8px 8px;
         }
+        
+        /* ================================
+           COMPLETE CSS UTILITY SYSTEM
+           (Tailwind Replacement - No External Dependencies!)
+           ================================ */
+        
+        /* === CSS Reset === */
+        *, *::before, *::after { box-sizing: border-box; }
+        * { margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body { line-height: 1.5; -webkit-font-smoothing: antialiased; }
+        img, picture, video, canvas, svg { display: block; max-width: 100%; }
+        input, button, textarea, select { font: inherit; }
+        p, h1, h2, h3, h4, h5, h6 { overflow-wrap: break-word; }
+        
+        /* === Display === */
+        .block { display: block; }
+        .inline-block { display: inline-block; }
+        .inline { display: inline; }
+        .flex { display: flex; }
+        .inline-flex { display: inline-flex; }
+        .grid { display: grid; }
+        .hidden { display: none; }
+        
+        /* === Position === */
+        .static { position: static; }
+        .fixed { position: fixed; }
+        .absolute { position: absolute; }
+        .relative { position: relative; }
+        .sticky { position: sticky; }
+        
+        /* === Inset === */
+        .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+        .top-0 { top: 0; }
+        .right-0 { right: 0; }
+        .bottom-0 { bottom: 0; }
+        .left-0 { left: 0; }
+        
+        /* === Z-Index === */
+        .z-0 { z-index: 0; }
+        .z-10 { z-index: 10; }
+        .z-20 { z-index: 20; }
+        .z-30 { z-index: 30; }
+        .z-40 { z-index: 40; }
+        .z-50 { z-index: 50; }
+        [class*="z-[9999]"] { z-index: 9999; }
+        [class*="z-[10000]"] { z-index: 10000; }
+        
+        /* === Flexbox === */
+        .flex-row { flex-direction: row; }
+        .flex-col { flex-direction: column; }
+        .flex-wrap { flex-wrap: wrap; }
+        .flex-1 { flex: 1 1 0%; }
+        .flex-auto { flex: 1 1 auto; }
+        .flex-none { flex: none; }
+        .flex-shrink-0 { flex-shrink: 0; }
+        .flex-grow { flex-grow: 1; }
+        .items-start { align-items: flex-start; }
+        .items-center { align-items: center; }
+        .items-end { align-items: flex-end; }
+        .items-stretch { align-items: stretch; }
+        .justify-start { justify-content: flex-start; }
+        .justify-center { justify-content: center; }
+        .justify-end { justify-content: flex-end; }
+        .justify-between { justify-content: space-between; }
+        .justify-around { justify-content: space-around; }
+        .self-start { align-self: flex-start; }
+        .self-center { align-self: center; }
+        .self-end { align-self: flex-end; }
+        
+        /* === Grid === */
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .grid-cols-7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+        .col-span-7 { grid-column: span 7 / span 7; }
+        
+        /* === Gap === */
+        .gap-1 { gap: 0.25rem; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-3 { gap: 0.75rem; }
+        .gap-4 { gap: 1rem; }
+        .gap-6 { gap: 1.5rem; }
+        .gap-8 { gap: 2rem; }
+        
+        /* === Padding === */
+        .p-1 { padding: 0.25rem; }
+        .p-2 { padding: 0.5rem; }
+        .p-3 { padding: 0.75rem; }
+        .p-4 { padding: 1rem; }
+        .p-6 { padding: 1.5rem; }
+        .p-8 { padding: 2rem; }
+        .px-1 { padding-left: 0.25rem; padding-right: 0.25rem; }
+        .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+        .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+        .px-4 { padding-left: 1rem; padding-right: 1rem; }
+        .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+        .px-8 { padding-left: 2rem; padding-right: 2rem; }
+        .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+        .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+        .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+        .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+        .py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+        .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+        .pt-2 { padding-top: 0.5rem; }
+        .pt-4 { padding-top: 1rem; }
+        .pt-6 { padding-top: 1.5rem; }
+        .pr-2 { padding-right: 0.5rem; }
+        .pr-4 { padding-right: 1rem; }
+        .pb-2 { padding-bottom: 0.5rem; }
+        .pb-4 { padding-bottom: 1rem; }
+        .pl-2 { padding-left: 0.5rem; }
+        .pl-4 { padding-left: 1rem; }
+        
+        /* === Margin === */
+        .m-auto { margin: auto; }
+        .mx-auto { margin-left: auto; margin-right: auto; }
+        .my-2 { margin-top: 0.5rem; margin-bottom: 0.5rem; }
+        .my-4 { margin-top: 1rem; margin-bottom: 1rem; }
+        .mt-1 { margin-top: 0.25rem; }
+        .mt-2 { margin-top: 0.5rem; }
+        .mt-3 { margin-top: 0.75rem; }
+        .mt-4 { margin-top: 1rem; }
+        .mt-6 { margin-top: 1.5rem; }
+        .mt-8 { margin-top: 2rem; }
+        .mr-1 { margin-right: 0.25rem; }
+        .mr-2 { margin-right: 0.5rem; }
+        .mr-3 { margin-right: 0.75rem; }
+        .mb-1 { margin-bottom: 0.25rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-3 { margin-bottom: 0.75rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+        .ml-1 { margin-left: 0.25rem; }
+        .ml-2 { margin-left: 0.5rem; }
+        .ml-3 { margin-left: 0.75rem; }
+        
+        /* === Width === */
+        .w-3 { width: 0.75rem; }
+        .w-4 { width: 1rem; }
+        .w-5 { width: 1.25rem; }
+        .w-6 { width: 1.5rem; }
+        .w-8 { width: 2rem; }
+        .w-10 { width: 2.5rem; }
+        .w-12 { width: 3rem; }
+        .w-16 { width: 4rem; }
+        .w-20 { width: 5rem; }
+        .w-32 { width: 8rem; }
+        .w-40 { width: 10rem; }
+        .w-48 { width: 12rem; }
+        .w-64 { width: 16rem; }
+        .w-80 { width: 20rem; }
+        .w-full { width: 100%; }
+        .w-screen { width: 100vw; }
+        [class*="w-[400px]"] { width: 400px; }
+        .max-w-md { max-width: 28rem; }
+        .max-w-lg { max-width: 32rem; }
+        .max-w-xl { max-width: 36rem; }
+        [class*="min-w-[200px]"] { min-width: 200px; }
+        
+        /* === Height === */
+        .h-3 { height: 0.75rem; }
+        .h-4 { height: 1rem; }
+        .h-5 { height: 1.25rem; }
+        .h-6 { height: 1.5rem; }
+        .h-8 { height: 2rem; }
+        .h-10 { height: 2.5rem; }
+        .h-12 { height: 3rem; }
+        .h-16 { height: 4rem; }
+        .h-full { height: 100%; }
+        .h-screen { height: 100vh; }
+        [class*="h-[60px]"] { height: 60px; }
+        [class*="h-[28px]"] { height: 28px; }
+        [class*="min-h-[40px]"] { min-height: 40px; }
+        .min-h-screen { min-height: 100vh; }
+        [class*="max-h-[200px]"] { max-height: 200px; }
+        
+        /* === Text Size === */
+        .text-xs { font-size: 0.75rem; line-height: 1rem; }
+        .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+        .text-base { font-size: 1rem; line-height: 1.5rem; }
+        .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+        .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+        .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+        
+        /* === Text Style === */
+        .font-normal { font-weight: 400; }
+        .font-medium { font-weight: 500; }
+        .font-semibold { font-weight: 600; }
+        .font-bold { font-weight: 700; }
+        .text-center { text-align: center; }
+        .text-left { text-align: left; }
+        .text-right { text-align: right; }
+        .uppercase { text-transform: uppercase; }
+        .lowercase { text-transform: lowercase; }
+        .line-through { text-decoration: line-through; }
+        .underline { text-decoration: underline; }
+        
+        /* === Colors - Text === */
+        .text-black { color: #000; }
+        .text-white { color: #fff; }
+        .text-gray-400 { color: #9ca3af; }
+        .text-gray-500 { color: #6b7280; }
+        .text-gray-600 { color: #4b5563; }
+        .text-gray-700 { color: #374151; }
+        .text-slate-400 { color: #94a3b8; }
+        .text-slate-500 { color: #64748b; }
+        .text-slate-600 { color: #475569; }
+        .text-slate-700 { color: #334155; }
+        .text-slate-800 { color: #1e293b; }
+        .text-slate-900 { color: #0f172a; }
+        .text-red-500 { color: #ef4444; }
+        .text-red-600 { color: #dc2626; }
+        .text-blue-500 { color: #3b82f6; }
+        .text-blue-600 { color: #2563eb; }
+        [class*="text-[#0d6bde]"] { color: #0d6bde; }
+        [class*="text-[#686f79]"] { color: #686f79; }
+        
+        /* === Colors - Background === */
+        .bg-white { background-color: #fff; }
+        .bg-black { background-color: #000; }
+        .bg-gray-50 { background-color: #f9fafb; }
+        .bg-gray-100 { background-color: #f3f4f6; }
+        .bg-gray-200 { background-color: #e5e7eb; }
+        .bg-gray-500 { background-color: #6b7280; }
+        .bg-slate-50 { background-color: #f8fafc; }
+        .bg-slate-100 { background-color: #f1f5f9; }
+        .bg-slate-200 { background-color: #e2e8f0; }
+        .bg-slate-900 { background-color: #0f172a; }
+        .bg-violet-500 { background-color: #8b5cf6; }
+        .bg-yellow-500 { background-color: #eab308; }
+        .bg-cyan-500 { background-color: #06b6d4; }
+        .bg-emerald-500 { background-color: #10b981; }
+        .bg-amber-500 { background-color: #f59e0b; }
+        .bg-rose-500 { background-color: #f43f5e; }
+        .bg-red-500 { background-color: #ef4444; }
+        .bg-blue-50 { background-color: #eff6ff; }
+        .bg-blue-100 { background-color: #dbeafe; }
+        .bg-blue-500 { background-color: #3b82f6; }
+        .bg-opacity-30 { --tw-bg-opacity: 0.3; }
+        
+        /* === Border === */
+        .border { border-width: 1px; border-style: solid; }
+        .border-0 { border-width: 0; }
+        .border-2 { border-width: 2px; }
+        .border-t { border-top-width: 1px; border-top-style: solid; }
+        .border-r { border-right-width: 1px; border-right-style: solid; }
+        .border-b { border-bottom-width: 1px; border-bottom-style: solid; }
+        .border-l { border-left-width: 1px; border-left-style: solid; }
+        .border-gray-200 { border-color: #e5e7eb; }
+        .border-gray-300 { border-color: #d1d5db; }
+        .border-slate-200 { border-color: #e2e8f0; }
+        .border-slate-300 { border-color: #cbd5e1; }
+        [class*="border-[#dfe3e8]"] { border-color: #dfe3e8; }
+        
+        /* === Border Radius === */
+        .rounded { border-radius: 0.25rem; }
+        .rounded-md { border-radius: 0.375rem; }
+        .rounded-lg { border-radius: 0.5rem; }
+        .rounded-xl { border-radius: 0.75rem; }
+        .rounded-full { border-radius: 9999px; }
+        
+        /* === Shadow === */
+        .shadow { box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1); }
+        .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+        .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1); }
+        .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1); }
+        
+        /* === Opacity === */
+        .opacity-0 { opacity: 0; }
+        .opacity-30 { opacity: 0.3; }
+        .opacity-50 { opacity: 0.5; }
+        .opacity-70 { opacity: 0.7; }
+        .opacity-100 { opacity: 1; }
+        
+        /* === Cursor === */
+        .cursor-pointer { cursor: pointer; }
+        .cursor-move { cursor: move; }
+        .cursor-not-allowed { cursor: not-allowed; }
+        
+        /* === Overflow === */
+        .overflow-hidden { overflow: hidden; }
+        .overflow-auto { overflow: auto; }
+        .overflow-y-auto { overflow-y: auto; }
+        .overflow-x-auto { overflow-x: auto; }
+        
+        /* === Pointer Events === */
+        .pointer-events-none { pointer-events: none; }
+        .pointer-events-auto { pointer-events: auto; }
+        
+        /* === User Select === */
+        .select-none { user-select: none; }
+        
+        /* === Object Fit === */
+        .object-cover { object-fit: cover; }
+        .object-contain { object-fit: contain; }
+        
+        /* === Transition === */
+        .transition { transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+        .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+        .transition-colors { transition-property: color, background-color, border-color, text-decoration-color, fill, stroke; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+        .transition-opacity { transition-property: opacity; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+        .duration-150 { transition-duration: 150ms; }
+        .duration-200 { transition-duration: 200ms; }
+        .duration-300 { transition-duration: 300ms; }
+        
+        /* === Transform === */
+        .scale-95 { transform: scale(0.95); }
+        .scale-100 { transform: scale(1); }
+        
+        /* === Animation === */
+        .animate-spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        
+        /* === Focus === */
+        .focus\\:outline-none:focus { outline: 2px solid transparent; outline-offset: 2px; }
+        .focus\\:ring-2:focus { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5); }
+        .focus\\:ring-slate-900:focus { box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.5); }
+        
+        /* === Hover === */
+        .hover\\:bg-gray-50:hover { background-color: #f9fafb; }
+        .hover\\:bg-gray-100:hover { background-color: #f3f4f6; }
+        .hover\\:bg-slate-50:hover { background-color: #f8fafc; }
+        .hover\\:bg-slate-100:hover { background-color: #f1f5f9; }
+        .hover\\:bg-slate-800:hover { background-color: #1e293b; }
+        .hover\\:text-slate-600:hover { color: #475569; }
+        [class*="hover:text-[#0a5bc4]"]:hover { color: #0a5bc4; }
+        .hover\\:underline:hover { text-decoration: underline; }
+        .hover\\:opacity-100:hover { opacity: 1; }
+        
+        /* === Disabled === */
+        .disabled\\:opacity-50:disabled { opacity: 0.5; }
+        .disabled\\:cursor-not-allowed:disabled { cursor: not-allowed; }
+        
+        /* === Responsive (Mobile) === */
+        @media (max-width: 768px) {
+            .md\\:hidden { display: none; }
+            .md\\:block { display: block; }
+        }
+        
+        /* === Specific Width Classes === */
+        [class*="w-[160px]"] { width: 160px; }
+        [class*="w-[200px]"] { width: 200px; }
+        [class*="w-[240px]"] { width: 240px; }
     </style>
 </head>
 <body class="bg-white">
@@ -623,6 +1046,11 @@
             <!-- Offline option shown after 5s -->
             <div id="offlineHint" class="hidden mt-8 text-xs text-slate-500">
                 <button onclick="startGuestMode()" class="text-blue-600 hover:underline">点击跳过，直接使用</button>
+            </div>
+            <div class="mt-4">
+                <button onclick="window.showDiag()" class="text-xs text-slate-400 hover:text-slate-600 underline">
+                    📊 查看诊断报告
+                </button>
             </div>
         </div>
     </div>
@@ -745,7 +1173,7 @@
                     </button>
                         <button onclick="showLoginModal()" class="w-full border border-slate-200 text-slate-900 text-sm font-medium px-4 py-3 rounded-md hover:bg-slate-50 transition-colors">
                             登录
-                        </button>
+                    </button>
                     </div>
                 </div>
                 
@@ -770,7 +1198,7 @@
                                 <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                                 </svg>
-                            </button>
+                        </button>
                         </div>
                     </div>
                 </div>
@@ -1213,7 +1641,9 @@
         setTimeout(() => {
             const wasHidden = forceHideLoadingScreen();
             if (wasHidden) {
-                console.warn('⚠️ Force hiding loading screen after 8s timeout (fallback)');
+                window.logMilestone('⚠️ 8秒兜底机制触发 - 强制隐藏loading');
+                window.diagnosticInfo.warnings.push('8秒后仍未正常加载，触发兜底机制');
+                window.diagnosticInfo.loadingScreenHidden = true;
                 // 如果强制隐藏了，也尝试渲染内容
                 if (typeof renderTasks === 'function') {
                     renderTasks();
@@ -1221,6 +1651,11 @@
                 if (typeof renderCalendarTasks === 'function') {
                     renderCalendarTasks();
                 }
+            }
+            // 自动显示诊断信息（如果还有问题）
+            if (window.diagnosticInfo.errors.length > 0 || !window.diagnosticInfo.domReady) {
+                console.warn('⚠️ 检测到加载问题，自动生成诊断报告');
+                setTimeout(window.showDiag, 500);
             }
         }, 8000);
         
@@ -1265,10 +1700,10 @@
         
         // Initialize Supabase once SDK is loaded (exposed globally for SDK callback)
         window.initializeSupabase = function() {
-            if (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE') {
+        if (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE') {
                 if (typeof window.supabase !== 'undefined') {
                     try {
-                        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
                         console.log('✅ Supabase initialized successfully')
                         return true
                     } catch (error) {
@@ -1280,8 +1715,8 @@
                     console.warn('⚠️ Supabase SDK not loaded yet');
                     return false
                 }
-            } else {
-                console.warn('⚠️ Supabase not configured. Using localStorage only.')
+        } else {
+            console.warn('⚠️ Supabase not configured. Using localStorage only.')
                 return false
             }
         }
@@ -1297,12 +1732,14 @@
         }, 500);
         
         // Version Check
-        console.log('Week Plan App - Version 1.8.4 - Android Loading Fix');
-        console.log('🚀 关键修复：解决安卓/非苹果设备加载白屏问题');
-        console.log('✅ 修复：添加 favicon 避免 404 错误阻塞加载');
-        console.log('✅ 修复：8秒后强制隐藏 loading screen（兜底机制）');
-        console.log('✅ 优化：3秒后显示离线选项（原5秒）');
-        console.log('✅ 优化：实时同步标志延迟200ms重置，避免竞态条件');
+        console.log('Week Plan App - Version 1.9.0 - Diagnostic System');
+        console.log('🎯 重大更新：内置完整诊断系统');
+        console.log('✅ 新增：自动错误捕获和性能追踪');
+        console.log('✅ 新增：详细加载里程碑日志');
+        console.log('✅ 新增：一键生成诊断报告（控制台输入 showDiag()）');
+        console.log('✅ 新增：Loading screen 内置诊断按钮');
+        console.log('✅ 修复：所有关键加载点添加日志');
+        console.log('✅ 优化：8秒后自动显示诊断报告（如有问题）');
         console.log('如果看到这条消息，说明页面已加载最新版本');
         
         // Global State
@@ -1356,18 +1793,27 @@
         
         // Check authentication state on page load
         async function checkAuthState() {
-            // Wait a bit for Supabase to initialize if not ready yet
-            if (!supabase && !window.supabaseLoadFailed) {
-                console.log('⏳ Waiting for Supabase to initialize...')
-                await new Promise(resolve => setTimeout(resolve, 1000))
-                window.initializeSupabase() // Try again
-            }
+            // ⚠️ 添加总超时保护，确保不会无限阻塞
+            const timeoutPromise = new Promise(resolve => {
+                setTimeout(() => {
+                    console.warn('⚠️ Auth check timeout after 2s, continuing with offline mode');
+                    resolve({ timeout: true });
+                }, 2000); // 2秒总超时
+            });
             
+            const authCheckPromise = (async () => {
+                // Wait a bit for Supabase to initialize if not ready yet
+                if (!supabase && !window.supabaseLoadFailed) {
+                    console.log('⏳ Waiting for Supabase to initialize...')
+                    await new Promise(resolve => setTimeout(resolve, 500)) // 减少到500ms
+                    window.initializeSupabase() // Try again
+                }
+                
             if (!supabase) {
-                // No Supabase configured or failed to load, stay logged out
-                console.log('ℹ️ No Supabase available, using offline mode')
+                    // No Supabase configured or failed to load, stay logged out
+                    console.log('ℹ️ No Supabase available, using offline mode')
                 updateUIForLoggedOut()
-                return
+                    return { success: true }
             }
             
             try {
@@ -1380,8 +1826,20 @@
                     updateUIForLoggedOut()
                     loadTasksFromStorage() // Fallback to localStorage
                 }
+                    return { success: true }
             } catch (error) {
                 console.error('Auth check error:', error)
+                updateUIForLoggedOut()
+                loadTasksFromStorage()
+                    return { success: true }
+                }
+            })();
+            
+            // 使用 Promise.race 确保最多等待2秒
+            const result = await Promise.race([authCheckPromise, timeoutPromise]);
+            
+            if (result.timeout) {
+                // 超时了，强制使用离线模式
                 updateUIForLoggedOut()
                 loadTasksFromStorage()
             }
@@ -1839,44 +2297,50 @@
         // =================================================================
         
         document.addEventListener('DOMContentLoaded', async () => {
-            // Generate calendar grid first
+            window.logMilestone('🎬 DOMContentLoaded 触发');
+            window.diagnosticInfo.domReady = true;
+            
+            try {
+                // Generate calendar grid first
             generateCalendarGrid();
             
-            // Then initialize week dates and time line
-            initializeWeekDates();
-            
-            // Show calendar headers after initialization (wait for render to complete)
-            setTimeout(() => {
-                const calendarHeader = document.getElementById('calendarHeader');
-                const weekDaysHeader = document.getElementById('weekDaysHeader');
-                if (calendarHeader) {
-                    calendarHeader.style.visibility = 'visible';
-                    calendarHeader.style.transition = 'opacity 0.3s ease';
-                    calendarHeader.style.opacity = '1';
-                }
-                if (weekDaysHeader) {
-                    weekDaysHeader.style.visibility = 'visible';
-                    weekDaysHeader.style.transition = 'opacity 0.3s ease';
-                    weekDaysHeader.style.opacity = '1';
-                }
-            }, 400);
-            
-            // Setup scroll listener for shadow effect
-            const calendarContainer = document.querySelector('.calendar-container');
-            const weekDaysHeader = document.getElementById('weekDaysHeader');
-            
-            if (calendarContainer && weekDaysHeader) {
-                calendarContainer.addEventListener('scroll', () => {
-                    if (calendarContainer.scrollTop > 10) {
-                        weekDaysHeader.classList.add('shadow-md');
-                    } else {
-                        weekDaysHeader.classList.remove('shadow-md');
+                // Then initialize week dates and time line
+                initializeWeekDates();
+                
+                // Show calendar headers after initialization (wait for render to complete)
+                setTimeout(() => {
+                    const calendarHeader = document.getElementById('calendarHeader');
+                    const weekDaysHeader = document.getElementById('weekDaysHeader');
+                    if (calendarHeader) {
+                        calendarHeader.style.visibility = 'visible';
+                        calendarHeader.style.transition = 'opacity 0.3s ease';
+                        calendarHeader.style.opacity = '1';
                     }
-                });
-            }
-            
-            // Check auth state first
+                    if (weekDaysHeader) {
+                        weekDaysHeader.style.visibility = 'visible';
+                        weekDaysHeader.style.transition = 'opacity 0.3s ease';
+                        weekDaysHeader.style.opacity = '1';
+                    }
+                }, 400);
+                
+                // Setup scroll listener for shadow effect
+                const calendarContainer = document.querySelector('.calendar-container');
+                const weekDaysHeader = document.getElementById('weekDaysHeader');
+                
+                if (calendarContainer && weekDaysHeader) {
+                    calendarContainer.addEventListener('scroll', () => {
+                        if (calendarContainer.scrollTop > 10) {
+                            weekDaysHeader.classList.add('shadow-md');
+                        } else {
+                            weekDaysHeader.classList.remove('shadow-md');
+                        }
+                    });
+                }
+                
+                // Check auth state first (with timeout protection)
+                window.logMilestone('🔐 开始检查认证状态');
             await checkAuthState();
+                window.logMilestone('✅ 认证检查完成');
             
             // Render tasks and calendar (loadDataFromSupabase already calls these if logged in)
             // But call again to ensure they render even if not logged in
@@ -1884,21 +2348,24 @@
                 renderTasks();
                 renderCalendarTasks();
             }
-            
-            // Initialize sidebar button states
-            const collapseBtn = document.querySelectorAll('.sidebar-collapse-btn');
-            const expandBtn = document.getElementById('expandSidebarBtn');
-            if (sidebarOpen) {
-                collapseBtn.forEach(btn => btn.classList.remove('hidden'));
-                if (expandBtn) expandBtn.classList.add('hidden');
-            } else {
-                collapseBtn.forEach(btn => btn.classList.add('hidden'));
-                if (expandBtn) expandBtn.classList.remove('hidden');
+                
+                // Initialize sidebar button states
+                const collapseBtn = document.querySelectorAll('.sidebar-collapse-btn');
+                const expandBtn = document.getElementById('expandSidebarBtn');
+                if (sidebarOpen) {
+                    collapseBtn.forEach(btn => btn.classList.remove('hidden'));
+                    if (expandBtn) expandBtn.classList.add('hidden');
+                } else {
+                    collapseBtn.forEach(btn => btn.classList.add('hidden'));
+                    if (expandBtn) expandBtn.classList.remove('hidden');
             }
             
             // Hide loading screen
+                window.logMilestone('👋 准备隐藏 loading screen');
             setTimeout(() => {
-                forceHideLoadingScreen();
+                    forceHideLoadingScreen();
+                    window.diagnosticInfo.loadingScreenHidden = true;
+                    window.logMilestone('✅ Loading screen 已隐藏');
             }, 100);
             
             // Keyboard shortcuts
@@ -1914,35 +2381,53 @@
                     closeDrawer();
                 }
             });
-            
-            // Task Form Submission
-            document.getElementById('taskForm').addEventListener('submit', (e) => {
-                e.preventDefault();
-                console.log('📝 表单提交开始...');
                 
-                const name = document.getElementById('taskName').value.trim();
+                // Task Form Submission
+                document.getElementById('taskForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    console.log('📝 表单提交开始...');
+                    
+                    const name = document.getElementById('taskName').value.trim();
+                    
+                    if (!name) {
+                        showToast('请输入任务名称');
+                        return;
+                    }
+                    
+                    // Use the shared save function
+                    const taskId = document.getElementById('taskId').value;
+                    saveTaskFromDrawer(true);
+                    
+                    // Clear pending calendar position
+                    pendingCalendarPosition = null;
+                    
+                    console.log('❌ 关闭弹窗...');
+                    const drawer = document.getElementById('drawer');
+                    const backdrop = document.getElementById('drawerBackdrop');
+                    drawer.classList.remove('drawer-open');
+                    drawer.classList.add('drawer-closed');
+                    backdrop.classList.add('hidden');
+                    
+                    console.log('✅ 表单提交完成！');
+                });
                 
-                if (!name) {
-                    showToast('请输入任务名称');
-                    return;
+                window.logMilestone('✅ DOMContentLoaded 完成初始化');
+            } catch (error) {
+                console.error('❌ DOMContentLoaded初始化错误:', error);
+                window.diagnosticInfo.errors.push(`DOMContentLoaded 错误: ${error.message}`);
+                window.logMilestone('❌ DOMContentLoaded 出现错误');
+                // 即使有错误也要隐藏loading screen
+                forceHideLoadingScreen();
+                window.diagnosticInfo.loadingScreenHidden = true;
+                // 尝试渲染基本内容
+                try {
+                    renderTasks();
+                    renderCalendarTasks();
+                } catch (renderError) {
+                    console.error('❌ 渲染错误:', renderError);
+                    window.diagnosticInfo.errors.push(`渲染错误: ${renderError.message}`);
                 }
-                
-                // Use the shared save function
-                const taskId = document.getElementById('taskId').value;
-                saveTaskFromDrawer(true);
-                
-                // Clear pending calendar position
-                pendingCalendarPosition = null;
-                
-                console.log('❌ 关闭弹窗...');
-                const drawer = document.getElementById('drawer');
-                const backdrop = document.getElementById('drawerBackdrop');
-                drawer.classList.remove('drawer-open');
-                drawer.classList.add('drawer-closed');
-                backdrop.classList.add('hidden');
-                
-                console.log('✅ 表单提交完成！');
-            });
+            }
         });
         
         // Sidebar Toggle
@@ -2529,7 +3014,12 @@
                 }
             });
             
-            // Setup drag and drop for thisweek section to enable reordering
+            // ✅ Setup drag and drop for planning section to enable reordering
+            document.querySelectorAll('.planning-task-list').forEach(list => {
+                setupTaskReordering(list, 'planning');
+            });
+            
+            // ✅ Setup drag and drop for thisweek section to enable reordering
             document.querySelectorAll('.thisweek-task-list').forEach(list => {
                 setupTaskReordering(list, 'thisweek');
             });
@@ -2579,7 +3069,9 @@
                     quadrantDiv.innerHTML = `<div class="text-xs text-gray-500 font-medium">${quadrant}</div>`;
                     
                     const taskList = document.createElement('div');
-                    taskList.className = 'space-y-2';
+                    // ✅ 添加 class 用于拖拽排序识别
+                    taskList.className = `space-y-2 ${sectionName}-task-list`;
+                    taskList.dataset.quadrant = quadrant; // 添加 quadrant 属性方便查找
                     
                     quadrantTasks.forEach(task => {
                         taskList.appendChild(createSimpleTaskElement(task));
@@ -3156,11 +3648,10 @@
                 e.preventDefault();
                 
                 if (draggedTask && draggedTask.section === sectionName) {
-                    // Get new order based on DOM
-                    const quadrantDiv = listElement.closest('[id^="thisweek-quadrant-"]');
-                    if (!quadrantDiv) return;
+                    // ✅ 从 listElement 获取 quadrant（适配 planning 和 thisweek）
+                    const quadrantName = listElement.dataset.quadrant;
+                    if (!quadrantName) return;
                     
-                    const quadrantName = quadrantDiv.id.replace('thisweek-quadrant-', '');
                     const taskElements = Array.from(listElement.children);
                     const newOrder = taskElements.map(el => el.dataset.taskId);
                     
