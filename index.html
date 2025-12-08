@@ -512,7 +512,7 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             z-index: 1000;
             opacity: 0;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.3s ease, background-color 0.3s ease;
             display: flex;
             align-items: center;
             gap: 12px;
@@ -521,6 +521,23 @@
         
         .toast.show {
             opacity: 1;
+        }
+        
+        /* Toast color variants */
+        .toast.bg-green-600 {
+            background-color: #16a34a;
+        }
+        
+        .toast.bg-red-600 {
+            background-color: #dc2626;
+        }
+        
+        .toast.bg-yellow-600 {
+            background-color: #ca8a04;
+        }
+        
+        .toast.bg-blue-600 {
+            background-color: #2563eb;
         }
         
         .toast span {
@@ -748,24 +765,59 @@
             <!-- User Section -->
             <div id="userSection" class="flex-shrink-0">
                 <!-- Logged Out State -->
-                <div id="loggedOutState" class="flex flex-col h-screen justify-center px-6 py-8 relative">
-                    <!-- Collapse Sidebar Button for logged out state -->
-                    <button onclick="toggleSidebar()" class="sidebar-collapse-btn absolute top-4 right-4 w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-all" title="收起侧边栏">
-                        <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                        </svg>
+                <div id="loggedOutState" class="flex flex-col h-screen">
+                    <!-- Header -->
+                    <div class="border-b border-slate-200 px-6 py-3 flex-shrink-0">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h1 class="text-base font-semibold text-black">Week Planner</h1>
+                                <p class="text-xs text-gray-500">计划你的一周</p>
+                    </div>
+                            <button onclick="toggleSidebar()" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-all" title="收起侧边栏">
+                                <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                                </svg>
                     </button>
-                    <div class="space-y-6">
-                        <div class="text-center mb-12">
-                            <h1 class="text-2xl font-semibold text-black mb-2">Week Planner</h1>
-                            <p class="text-sm text-gray-600">登录后可在多设备间同步您的任务</p>
                         </div>
-                        <button onclick="showSignupModal()" class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-3 rounded-md hover:bg-slate-800 transition-colors">
-                        注册
+                    </div>
+                    
+                    <!-- Planning Section Header -->
+                    <div class="border-b border-slate-200 px-6 py-4 flex-shrink-0">
+                        <div class="flex items-center justify-between">
+                            <p class="text-base font-medium text-black">计划中 (0)</p>
+                            <svg class="w-5 h-5 text-gray-400 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    <!-- Add Task Button - Click to show auth modal -->
+                    <div class="px-6 py-4 flex-1 flex items-center justify-center">
+                        <button onclick="showUnifiedAuthModal()" class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            添加任务
                     </button>
-                        <button onclick="showLoginModal()" class="w-full border border-slate-200 text-slate-900 text-sm font-medium px-4 py-3 rounded-md hover:bg-slate-50 transition-colors">
-                            登录
-                    </button>
+                </div>
+                
+                    <!-- Other Sections (collapsed) -->
+                    <div class="border-t border-slate-200 px-6 py-4 flex-shrink-0">
+                        <div class="flex items-center justify-between">
+                            <p class="text-base font-medium text-black">本周要务 (0)</p>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                        </div>
+                    
+                    <div class="border-t border-slate-200 px-6 py-4 flex-shrink-0">
+                        <div class="flex items-center justify-between">
+                            <p class="text-base font-medium text-black">已完成 (0)</p>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                    </div>
                     </div>
                 </div>
                 
@@ -1003,6 +1055,121 @@
         </div>
         <div class="context-menu-item" onclick="contextMenuDelete()">
             <span class="text-red-600">🗑️ 删除</span>
+        </div>
+    </div>
+    
+    <!-- Unified Auth Modal (Login/Signup) -->
+    <div id="unifiedAuthModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div class="px-6 py-5 border-b border-slate-200">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-semibold text-black">登录 / 注册</h2>
+                    <button onclick="closeUnifiedAuthModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 mt-2">选择登录方式，如果是新用户将自动创建账号</p>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+                
+                <!-- WeChat QR Code Login (Placeholder) -->
+                <button onclick="showWeChatQRCode()" class="w-full border-2 border-green-500 text-green-700 text-sm font-medium px-4 py-3 rounded-md hover:bg-green-50 transition-colors flex items-center justify-center gap-3">
+                    <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 0 1-.023-.156.49.49 0 0 1 .201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-6.656-6.088V8.89c-.135-.01-.27-.027-.407-.03zm-2.53 3.274c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.969-.982zm4.844 0c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.969-.982z"/>
+                    </svg>
+                    <span class="text-base">微信扫码登录</span>
+                </button>
+                
+                <!-- Google OAuth -->
+                <button onclick="signInWithGoogle(); closeUnifiedAuthModal()" class="w-full border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2.5 rounded-md hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Google 快捷登录
+                </button>
+                
+                <div class="relative">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-slate-200"></div>
+                    </div>
+                    <div class="relative flex justify-center text-xs">
+                        <span class="px-2 bg-white text-gray-500">或使用邮箱</span>
+                    </div>
+                </div>
+                
+                <!-- Email/Password Form (Unified) -->
+                <form id="unifiedAuthForm" onsubmit="handleUnifiedAuth(event)" class="space-y-4">
+                    <div>
+                        <label class="text-sm font-medium text-black block mb-1">邮箱</label>
+                        <input 
+                            type="email" 
+                            id="unifiedEmail" 
+                            required
+                            placeholder="your@email.com"
+                            class="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        />
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-black block mb-1">密码</label>
+                        <input 
+                            type="password" 
+                            id="unifiedPassword" 
+                            required
+                            placeholder="至少6位字符"
+                            minlength="6"
+                            class="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        />
+                    </div>
+                    <button 
+                        type="submit" 
+                        class="w-full bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800 transition-colors"
+                    >
+                        登录 / 注册
+                    </button>
+                </form>
+                
+                <p class="text-xs text-center text-gray-400">
+                    继续即表示您同意我们的服务条款和隐私政策
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- WeChat QR Code Modal -->
+    <div id="wechatQRModal" class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4">
+            <div class="px-6 py-5 border-b border-slate-200">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-semibold text-black">微信扫码登录</h2>
+                    <button onclick="closeWeChatQRModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="px-6 py-8 flex flex-col items-center">
+                <!-- QR Code Placeholder -->
+                <div class="w-48 h-48 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
+                    <div class="text-center">
+                        <svg class="w-16 h-16 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                        </svg>
+                        <p class="text-sm text-gray-500">微信登录开发中</p>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-600 text-center">
+                    打开微信扫描二维码登录
+                </p>
+                <p class="text-xs text-gray-400 text-center mt-2">
+                    该功能即将推出，请使用其他登录方式
+                </p>
+            </div>
         </div>
     </div>
     
@@ -1566,6 +1733,30 @@
         }
         
         // Modal controls
+        
+        // Unified Auth Modal (New)
+        function showUnifiedAuthModal() {
+            document.getElementById('unifiedAuthModal').classList.remove('hidden')
+        }
+        
+        function closeUnifiedAuthModal() {
+            document.getElementById('unifiedAuthModal').classList.add('hidden')
+            document.getElementById('unifiedAuthForm').reset()
+        }
+        
+        // WeChat QR Code Modal
+        function showWeChatQRCode() {
+            closeUnifiedAuthModal()
+            document.getElementById('wechatQRModal').classList.remove('hidden')
+            // TODO: In production, generate and display actual QR code
+            console.log('🚧 微信登录功能开发中...')
+        }
+        
+        function closeWeChatQRModal() {
+            document.getElementById('wechatQRModal').classList.add('hidden')
+        }
+        
+        // Old modal controls (for backward compatibility)
         function showLoginModal() {
             document.getElementById('loginModal').classList.remove('hidden')
         }
@@ -1715,7 +1906,99 @@
             }
         }
         
-        // Email/Password Sign In
+        // Unified Auth Handler (Auto Login/Signup)
+        async function handleUnifiedAuth(event) {
+            event.preventDefault()
+            
+            if (!supabase) {
+                console.error('❌ Supabase 未初始化');
+                if (typeof window.supabase !== 'undefined') {
+                    console.log('🔄 尝试立即初始化 Supabase...');
+                    window.initializeSupabase();
+                    if (supabase) {
+                        console.log('✅ 初始化成功！继续认证...');
+                        return handleUnifiedAuth(event);
+                    }
+                }
+                alert('Supabase 初始化失败\n\n请刷新页面或查看控制台');
+                return
+            }
+            
+            const email = document.getElementById('unifiedEmail').value
+            const password = document.getElementById('unifiedPassword').value
+            const submitBtn = event.target.querySelector('button[type="submit"]')
+            const originalText = submitBtn.textContent
+            
+            try {
+                submitBtn.disabled = true
+                submitBtn.textContent = '处理中...'
+                
+                // Step 1: Try to sign in
+                console.log('🔐 尝试登录:', email)
+                const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                })
+                
+                if (signInError) {
+                    // Check if error is due to invalid credentials (user might not exist)
+                    if (signInError.message.includes('Invalid login credentials') || 
+                        signInError.message.includes('User not found')) {
+                        
+                        console.log('👤 用户不存在，自动注册:', email)
+                        submitBtn.textContent = '正在注册...'
+                        
+                        // Step 2: User doesn't exist, sign up automatically
+                        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                            email: email,
+                            password: password
+                        })
+                        
+                        if (signUpError) throw signUpError
+                        
+                        closeUnifiedAuthModal()
+                        
+                        // Check if email confirmation is required
+                        if (signUpData?.user?.identities?.length === 0) {
+                            alert('注册成功！\n\n请检查您的邮箱 (' + email + ') 以验证账号。\n验证后即可登录使用。')
+                        } else {
+                            showToast('注册成功！欢迎使用 Week Planner')
+                        }
+                        return
+                    } else {
+                        // Other sign in errors (wrong password, etc.)
+                        throw signInError
+                    }
+                }
+                
+                // Sign in successful
+                console.log('✅ 登录成功, auth listener will update UI');
+                closeUnifiedAuthModal()
+                showToast('登录成功！')
+                
+            } catch (error) {
+                console.error('Unified auth error:', error)
+                
+                // User-friendly error messages
+                let errorMsg = '操作失败: '
+                if (error.message.includes('Invalid login credentials')) {
+                    errorMsg += '邮箱或密码错误'
+                } else if (error.message.includes('Email not confirmed')) {
+                    errorMsg += '请先验证您的邮箱'
+                } else if (error.message.includes('Password should be at least')) {
+                    errorMsg += '密码至少需要6位字符'
+                } else {
+                    errorMsg += error.message
+                }
+                
+                alert(errorMsg)
+            } finally {
+                submitBtn.disabled = false
+                submitBtn.textContent = originalText
+            }
+        }
+        
+        // Email/Password Sign In (Legacy, for old modal)
         async function signInWithEmail(event) {
             event.preventDefault()
             
@@ -1834,14 +2117,25 @@
                 }
                 
                 if (data) {
+                    // ✅ 记录远程数据的更新时间
+                    if (data.updated_at) {
+                        lastRemoteUpdateTime = new Date(data.updated_at).getTime();
+                        console.log('📅 远程数据时间:', new Date(lastRemoteUpdateTime).toLocaleString());
+                    }
+                    
                     tasks = data.tasks || []
                     calendarTasks = (data.calendar_tasks || []).map(ct => ({
                         ...ct,
                         duration: ct.duration || 60 // Ensure all tasks have duration (default 60 min)
                     }))
+                    
+                    // ✅ 同步到本地存储
+                    saveTasksToStorage();
+                    
                     console.log('✅ 从Supabase加载数据:', {
                         tasks: tasks.length,
-                        calendarTasks: calendarTasks.length
+                        calendarTasks: calendarTasks.length,
+                        updatedAt: data.updated_at
                     })
                     renderTasks()
                     renderCalendarTasks()
@@ -1855,42 +2149,36 @@
                 }
             } catch (error) {
                 console.error('Load data error:', error)
-                showToast('加载数据失败，使用本地数据')
+                showToast('加载数据失败，使用本地数据', 'error')
                 loadTasksFromStorage() // Fallback
                 renderCalendarTasks() // 确保渲染日历任务
             }
         }
         
-        // Save data to Supabase
-        // isReordering: 是否是拖拽排序操作（需要更长的冷却期）
-        async function saveDataToSupabase(isReordering = false) {
+        // ========================================================================
+        // Save data to Supabase (Simplified - No Cooldown Period)
+        // ========================================================================
+        
+        async function saveDataToSupabase() {
             // ✅ 立即保存到本地存储（同步操作，确保数据不丢失）
             saveTasksToStorage();
             
-            // ✅ 记录本地保存时间和冷却期时长（冷却期内忽略实时推送，避免本地操作被覆盖）
-            // 拖拽排序：5分钟冷却期 | 其他操作：5秒冷却期
-            lastLocalSaveTime = Date.now();
-            currentCooldownPeriod = isReordering ? 300000 : 5000; // 5分钟 or 5秒
-            
-            // ✅ 保存到 localStorage，刷新页面后也能保持冷却期
-            localStorage.setItem('lastLocalSaveTime', lastLocalSaveTime.toString());
-            localStorage.setItem('currentCooldownPeriod', currentCooldownPeriod.toString());
-            
-            const cooldownExpiry = new Date(lastLocalSaveTime + currentCooldownPeriod);
-            console.log(`⏰ 设置冷却期: ${isReordering ? '5分钟(拖拽排序)' : '5秒(常规操作)'}`);
-            console.log(`   冷却期到期时间: ${cooldownExpiry.toLocaleTimeString()}`);
+            // ✅ 记录本地保存时间戳（用于 LWW 比较）
+            const saveTime = Date.now();
+            lastLocalSaveTime = saveTime;
             
             if (!supabase || !currentUser) {
-                console.log('⚠️ 未登录，使用localStorage')
+                console.log('⚠️ 未登录，仅保存到 localStorage')
                 return
             }
             
             try {
-                console.log('💾 保存到Supabase:', {
+                const updateTime = new Date(saveTime).toISOString();
+                console.log('💾 保存到 Supabase:', {
                     tasks: tasks.length,
                     calendarTasks: calendarTasks.length,
-                    type: isReordering ? '排序' : '常规'
-                })
+                    timestamp: new Date(saveTime).toLocaleString()
+                });
                 
                 const { data, error } = await supabase
                     .from('user_tasks')
@@ -1898,51 +2186,205 @@
                         user_id: currentUser.id,
                         tasks: tasks,
                         calendar_tasks: calendarTasks,
-                        updated_at: new Date().toISOString()
+                        updated_at: updateTime
                     }, {
                         onConflict: 'user_id'
                     })
                 
                 if (error) throw error
                 
-                console.log('✅ 保存成功')
+                console.log('✅ 保存成功，时间戳:', new Date(saveTime).toLocaleString());
             } catch (error) {
                 console.error('❌ 保存失败:', error)
-                // Fallback to localStorage
-                saveTasksToStorage()
+                showToast('保存失败，请检查网络连接', 'error')
             }
         }
         
-        // Manual sync button
+        // Manual sync button with smart conflict resolution
         async function syncData() {
             if (!supabase || !currentUser) {
-                alert('请先登录')
+                showToast('请先登录', 'error')
                 return
             }
             
-            // Force save first
-            await saveDataToSupabase()
-            // Then reload to ensure we have latest
-            await loadDataFromSupabase()
-            showToast('数据同步成功')
+            try {
+                showToast('正在同步数据...', 'info')
+                
+                // Step 1: Check remote data timestamp
+                const { data: remoteData, error: fetchError } = await supabase
+                    .from('user_tasks')
+                    .select('updated_at')
+                    .eq('user_id', currentUser.id)
+                    .single()
+                
+                if (fetchError && fetchError.code !== 'PGRST116') {
+                    throw fetchError
+                }
+                
+                // Step 2: Compare timestamps
+                if (remoteData && remoteData.updated_at) {
+                    const remoteTime = new Date(remoteData.updated_at).getTime()
+                    const localTime = lastLocalSaveTime || 0
+                    
+                    console.log('🔍 同步检查:', {
+                        remote: new Date(remoteTime).toLocaleString(),
+                        local: new Date(localTime).toLocaleString()
+                    })
+                    
+                    if (remoteTime > localTime) {
+                        // Remote is newer, load it
+                        console.log('📥 远程数据更新，加载中...')
+                        await loadDataFromSupabase()
+                        showToast('✅ 已同步最新数据')
+                    } else if (localTime > remoteTime) {
+                        // Local is newer, save it
+                        console.log('📤 本地数据更新，上传中...')
+                        await saveDataToSupabase()
+                        showToast('✅ 已上传本地数据')
+                    } else {
+                        // Same, no action needed
+                        console.log('✅ 数据已是最新')
+                        showToast('✅ 数据已是最新')
+                    }
+                } else {
+                    // No remote data, save local
+                    console.log('📤 首次同步，上传本地数据...')
+                    await saveDataToSupabase()
+                    showToast('✅ 数据已同步到云端')
+                }
+                
+            } catch (error) {
+                console.error('❌ 同步失败:', error)
+                showToast('同步失败: ' + error.message, 'error')
+            }
         }
         
-        // Setup real-time subscription for data sync
+        // ========================================================================
+        // LWW (Last-Write-Wins) + User Activity Detection
+        // ========================================================================
+        
         let realtimeChannel = null;
+        let lastLocalSaveTime = 0; // 记录最后一次本地保存的时间戳
+        let lastUserActionTime = Date.now(); // 记录最后一次用户操作时间
+        let lastRemoteUpdateTime = null; // 记录最后一次远程更新的时间戳
         
-        // ✅ 从 localStorage 恢复冷却期状态（支持页面刷新）
-        let lastLocalSaveTime = parseInt(localStorage.getItem('lastLocalSaveTime') || '0');
-        let currentCooldownPeriod = parseInt(localStorage.getItem('currentCooldownPeriod') || '5000');
+        // 活跃检测阈值
+        const INACTIVE_THRESHOLD = 120000;  // 2分钟无操作 = 非活跃状态
+        const CONFLICT_THRESHOLD = 5000;    // 5秒内的操作可能冲突
         
-        // 检查是否还在冷却期内
-        if (lastLocalSaveTime > 0) {
-            const remaining = lastLocalSaveTime + currentCooldownPeriod - Date.now();
-            if (remaining > 0) {
-                console.log(`🔄 页面加载时检测到活跃冷却期，剩余 ${Math.round(remaining / 1000)}秒`);
+        // 追踪用户活跃状态
+        function trackUserActivity() {
+            lastUserActionTime = Date.now();
+        }
+        
+        // 监听所有用户交互
+        document.addEventListener('click', trackUserActivity);
+        document.addEventListener('keydown', trackUserActivity);
+        document.addEventListener('dragstart', trackUserActivity);
+        document.addEventListener('touchstart', trackUserActivity);
+        
+        // ========================================================================
+        // LWW + Activity Detection: Core Logic
+        // ========================================================================
+        
+        /**
+         * 处理实时更新 - LWW (Last-Write-Wins) + 用户活跃检测
+         */
+        function handleRealtimeUpdate(remoteData) {
+            const remoteTime = new Date(remoteData.updated_at).getTime();
+            const localTime = lastLocalSaveTime || 0;
+            const timeSinceUserAction = Date.now() - lastUserActionTime;
+            
+            console.log('🔍 实时更新分析:', {
+                remoteTime: new Date(remoteTime).toLocaleString(),
+                localTime: localTime ? new Date(localTime).toLocaleString() : '无',
+                timeSinceUserAction: `${Math.round(timeSinceUserAction / 1000)}秒`,
+                isUserActive: timeSinceUserAction < INACTIVE_THRESHOLD
+            });
+            
+            // ✅ 策略1: 远程数据更旧 → 直接忽略
+            if (remoteTime <= localTime) {
+                console.log('⏩ 远程数据更旧，忽略 (LWW)');
+                return;
+            }
+            
+            // ✅ 策略2: 用户非活跃（2分钟无操作）→ 直接接受远程更新
+            if (timeSinceUserAction > INACTIVE_THRESHOLD) {
+                console.log('✅ 用户非活跃，接受远程更新');
+                applyRemoteUpdate(remoteData);
+                showToast('已同步其他设备的更新', 'info');
+                return;
+            }
+            
+            // ✅ 策略3: 用户活跃但最后操作超过5秒 → 安全接受
+            if (timeSinceUserAction > CONFLICT_THRESHOLD) {
+                console.log('✅ 用户5秒未操作，安全接受远程更新');
+                applyRemoteUpdate(remoteData);
+                return;
+            }
+            
+            // ⚠️ 策略4: 用户刚操作（5秒内）+ 远程有更新 → 真正的冲突！
+            console.warn('⚠️ 检测到数据冲突！用户刚操作 + 远程更新');
+            console.warn('   本地时间:', new Date(localTime).toLocaleString());
+            console.warn('   远程时间:', new Date(remoteTime).toLocaleString());
+            console.warn('   用户最后操作:', `${Math.round(timeSinceUserAction / 1000)}秒前`);
+            
+            showConflictDialog(remoteData);
+        }
+        
+        /**
+         * 应用远程更新到本地
+         */
+        function applyRemoteUpdate(remoteData) {
+            const remoteTime = new Date(remoteData.updated_at).getTime();
+            
+            console.log('📥 应用远程更新:', {
+                tasks: remoteData.tasks?.length || 0,
+                calendarTasks: remoteData.calendar_tasks?.length || 0,
+                timestamp: new Date(remoteTime).toLocaleString()
+            });
+            
+            // 更新数据
+            tasks = remoteData.tasks || [];
+            calendarTasks = (remoteData.calendar_tasks || []).map(ct => ({
+                ...ct,
+                duration: ct.duration || 60
+            }));
+            
+            // 记录远程更新时间
+            lastRemoteUpdateTime = remoteTime;
+            
+            // 同步到本地存储
+            saveTasksToStorage();
+            
+            // 重新渲染
+            renderTasks();
+            renderCalendarTasks();
+        }
+        
+        /**
+         * 显示冲突解决对话框
+         */
+        function showConflictDialog(remoteData) {
+            const timeSinceAction = Math.round((Date.now() - lastUserActionTime) / 1000);
+            
+            const userChoice = confirm(
+                '⚠️ 检测到数据冲突！\n\n' +
+                `您在 ${timeSinceAction} 秒前刚做了修改，\n` +
+                '但其他设备也有新的更新。\n\n' +
+                '点击"确定"接受其他设备的更新\n' +
+                '点击"取消"保留当前设备的修改'
+            );
+            
+            if (userChoice) {
+                console.log('✅ 用户选择：接受远程更新');
+                applyRemoteUpdate(remoteData);
+                showToast('已同步其他设备的更新', 'info');
             } else {
-                console.log('ℹ️ 冷却期已过期，已清除');
-                lastLocalSaveTime = 0;
-                currentCooldownPeriod = 5000;
+                console.log('❌ 用户选择：保留本地数据');
+                // 强制推送本地数据到 Supabase
+                saveDataToSupabase();
+                showToast('已保留当前设备的修改', 'warning');
             }
         }
         
@@ -1953,6 +2395,8 @@
             if (realtimeChannel) {
                 supabase.removeChannel(realtimeChannel);
             }
+            
+            console.log('🔄 设置实时订阅 (LWW + 活跃检测模式)');
             
             // Subscribe to changes in user_tasks table
             realtimeChannel = supabase
@@ -1966,40 +2410,14 @@
                         filter: `user_id=eq.${currentUser.id}`
                     },
                     (payload) => {
-                        console.log('📡 Real-time update received:', payload);
-                        console.log('   Event type:', payload.eventType);
-                        console.log('   Updated at:', payload.new?.updated_at);
-                        
-                        // ✅ 检查是否在冷却期内（避免本地操作被远程数据覆盖）
-                        // 拖拽排序后5分钟内忽略 | 其他操作后5秒内忽略
-                        const timeSinceLastSave = Date.now() - lastLocalSaveTime;
-                        if (timeSinceLastSave < currentCooldownPeriod) {
-                            const remainingTime = Math.round((currentCooldownPeriod - timeSinceLastSave) / 1000);
-                            console.log(`⏩ Ignoring real-time update (${remainingTime}s cooldown remaining)`);
-                            return;
-                        }
+                        console.log('📡 实时更新接收:', payload.eventType);
                         
                         // Reload data when changes detected from other devices/sessions
                         if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
-                            const newData = payload.new;
-                            if (newData && newData.user_id === currentUser.id) {
-                                // ✅ 检查数据时间戳，只应用比本地更新的数据
-                                const remoteTime = new Date(newData.updated_at).getTime();
-                                const localSaveTime = lastLocalSaveTime;
-                                
-                                if (localSaveTime > 0 && remoteTime < localSaveTime) {
-                                    console.log(`⏩ Ignoring outdated real-time update`);
-                                    console.log(`   Remote: ${new Date(remoteTime).toLocaleTimeString()}`);
-                                    console.log(`   Local:  ${new Date(localSaveTime).toLocaleTimeString()}`);
-                                    return;
-                                }
-                                
-                                console.log('✅ Applying real-time update from remote device');
-                                tasks = newData.tasks || [];
-                                calendarTasks = newData.calendar_tasks || [];
-                                renderTasks();
-                                renderCalendarTasks();
-                            }
+                            const remoteData = payload.new;
+                            if (!remoteData || remoteData.user_id !== currentUser.id) return;
+                            
+                            handleRealtimeUpdate(remoteData);
                         }
                     }
                 )
@@ -4446,15 +4864,28 @@
         }
         
         // Toast Notification
-        function showToast(message) {
+        function showToast(message, type = 'success') {
             const toast = document.getElementById('toast');
+            
+            // 根据类型设置样式
+            toast.classList.remove('bg-green-600', 'bg-red-600', 'bg-yellow-600', 'bg-blue-600');
+            if (type === 'error') {
+                toast.classList.add('bg-red-600');
+            } else if (type === 'warning') {
+                toast.classList.add('bg-yellow-600');
+            } else if (type === 'info') {
+                toast.classList.add('bg-blue-600');
+            } else {
+                toast.classList.add('bg-green-600');
+            }
+            
             toast.innerHTML = message;
             toast.classList.add('show');
             
             if (undoTimeout) clearTimeout(undoTimeout);
             undoTimeout = setTimeout(() => {
                 toast.classList.remove('show');
-            }, 3000);
+            }, type === 'error' ? 5000 : 3000); // 错误消息显示更久
         }
         
         function showToastWithUndo(message) {
