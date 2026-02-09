@@ -151,7 +151,53 @@
         // Load Supabase asynchronously - app works without it in offline mode!
         (function() {
             const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+            <script>
+(function() {
+    console.log('🚀 开始加载 Supabase SDK...');
+    
+    const cdns = [
+        'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+        'https://unpkg.com/@supabase/supabase-js@2',
+        'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.js',
+        'https://unpkg.com/@supabase/supabase-js@2.39.0/dist/umd/supabase.js'
+    ];
+    
+    function loadFromCDN(index) {
+        if (index >= cdns.length) {
+            console.error('❌ 所有 CDN 都加载失败');
+            return;
+        }
+        
+        const script = document.createElement('script');
+        script.src = cdns[index];
+        script.async = false;
+        
+        const timeout = setTimeout(() => {
+            console.warn(`⏰ CDN ${index + 1} 超时`);
+            script.remove();
+            loadFromCDN(index + 1);
+        }, 10000);
+        
+        script.onload = () => {
+            clearTimeout(timeout);
+            console.log(`✅ SDK 加载成功 (CDN ${index + 1})`);
+            if (typeof window.initializeSupabase === 'function') {
+                window.initializeSupabase();
+            }
+        };
+        
+        script.onerror = () => {
+            clearTimeout(timeout);
+            console.warn(`❌ CDN ${index + 1} 失败`);
+            loadFromCDN(index + 1);
+        };
+        
+        document.head.appendChild(script);
+    }
+    
+    loadFromCDN(0);
+})();
+</script>;
             script.async = true;
             
             // Short timeout - fall back to offline mode quickly
