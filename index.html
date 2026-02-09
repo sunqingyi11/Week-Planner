@@ -2169,16 +2169,19 @@
         }
         
         // ========================================================================
-        // Save data to Supabase (Simplified - No Cooldown Period)
+        // Save data to Supabase with Reordering Cooldown Support
         // ========================================================================
-        
-        async function saveDataToSupabase() {
+        // isReordering: 是否是拖拽排序操作（需要更长的冷却期防止多端冲突）
+        async function saveDataToSupabase(isReordering = false) {
             // ✅ 立即保存到本地存储（同步操作，确保数据不丢失）
             saveTasksToStorage();
             
-            // ✅ 记录本地保存时间戳（用于 LWW 比较）
+            // ✅ 记录本地保存时间和冷却期时长（冷却期内忽略实时推送，避免本地操作被覆盖）
+            // 拖拽排序：5分钟冷却期 | 其他操作：5秒冷却期
             const saveTime = Date.now();
             lastLocalSaveTime = saveTime;
+            currentCooldownPeriod = isReordering ? 300000 : 5000; // 5分钟 or 5秒
+            console.log(`⏰ 设置冷却期: ${isReordering ? '5分钟(拖拽排序)' : '5秒(常规操作)'}`);
             
             if (!supabaseClient || !currentUser) {
                 console.log('⚠️ 未登录，仅保存到 localStorage')
@@ -2276,6 +2279,7 @@
         
         let realtimeChannel = null;
         let lastLocalSaveTime = 0; // 记录最后一次本地保存的时间戳
+        let currentCooldownPeriod = 5000; // 当前冷却期时长（动态调整：拖拽=5分钟，其他=5秒）
         let lastUserActionTime = Date.now(); // 记录最后一次用户操作时间
         let lastRemoteUpdateTime = null; // 记录最后一次远程更新的时间戳
         
@@ -2305,13 +2309,23 @@
             const remoteTime = new Date(remoteData.updated_at).getTime();
             const localTime = lastLocalSaveTime || 0;
             const timeSinceUserAction = Date.now() - lastUserActionTime;
+            const timeSinceLastSave = Date.now() - lastLocalSaveTime;
             
             console.log('🔍 实时更新分析:', {
                 remoteTime: new Date(remoteTime).toLocaleString(),
                 localTime: localTime ? new Date(localTime).toLocaleString() : '无',
                 timeSinceUserAction: `${Math.round(timeSinceUserAction / 1000)}秒`,
+                timeSinceLastSave: `${Math.round(timeSinceLastSave / 1000)}秒`,
+                cooldownPeriod: `${Math.round(currentCooldownPeriod / 1000)}秒`,
                 isUserActive: timeSinceUserAction < INACTIVE_THRESHOLD
             });
+            
+            // ✅ 策略0: 冷却期保护 → 本地刚保存，忽略远程更新（防止拖拽排序被覆盖）
+            if (timeSinceLastSave < currentCooldownPeriod) {
+                const remainingSeconds = Math.round((currentCooldownPeriod - timeSinceLastSave) / 1000);
+                console.log(`⏩ 冷却期保护：忽略远程更新（剩余 ${remainingSeconds} 秒）`);
+                return;
+            }
             
             // ✅ 策略1: 远程数据更旧 → 直接忽略
             if (remoteTime <= localTime) {
@@ -3168,12 +3182,24 @@
             });
             
             // ✅ Setup drag and drop for planning section to enable reordering
-            document.querySelectorAll('.planning-task-list').forEach(list => {
+            document.querySelectorAll('#taskSections .task-list').forEach(list => {
+                // 添加 quadrant 属性
+                const quadrantDiv = list.closest('[id^="quadrant-"]');
+                if (quadrantDiv) {
+                    const quadrantName = quadrantDiv.id.replace('quadrant-', '');
+                    list.dataset.quadrant = quadrantName;
+                }
                 setupTaskReordering(list, 'planning');
             });
             
             // ✅ Setup quadrant drop zones for thisweek section (象限间拖拽)
             document.querySelectorAll('.thisweek-task-list').forEach(list => {
+                // 添加 quadrant 属性
+                const quadrantDiv = list.closest('[id^="thisweek-quadrant-"]');
+                if (quadrantDiv) {
+                    const quadrantName = quadrantDiv.id.replace('thisweek-quadrant-', '');
+                    list.dataset.quadrant = quadrantName;
+                }
                 setupQuadrantDropZone(list);
             });
             
@@ -3188,6 +3214,22 @@
                 if (quadrantContainer) {
                     quadrantContainer.appendChild(createSimpleTaskElement(task));
                 }
+            });
+            
+            // ✅ Setup quadrant drop zones for finished section (象限间拖拽)
+            document.querySelectorAll('.finished-task-list').forEach(list => {
+                // 添加 quadrant 属性
+                const quadrantDiv = list.closest('[id^="finished-quadrant-"]');
+                if (quadrantDiv) {
+                    const quadrantName = quadrantDiv.id.replace('finished-quadrant-', '');
+                    list.dataset.quadrant = quadrantName;
+                }
+                setupQuadrantDropZone(list);
+            });
+            
+            // ✅ Setup drag and drop for finished section to enable reordering (象限内排序)
+            document.querySelectorAll('.finished-task-list').forEach(list => {
+                setupTaskReordering(list, 'finished');
             });
             
             // Update counts
@@ -3730,23 +3772,29 @@
             }
             boundQuadrantDropZones.add(listElement);
             
-            // ✅ 支持 planning 和 thisweek 的象限 ID 格式
+            // ✅ 支持所有 section 的象限 ID 格式
             // planning: id="quadrant-重要不紧急"
             // thisweek: id="thisweek-quadrant-重要不紧急"
+            // finished: id="finished-quadrant-重要不紧急"
             const quadrantDiv = listElement.closest('[id*="quadrant-"]');
             if (!quadrantDiv) return;
             
             // 从 ID 中提取象限名称
-            const quadrantName = quadrantDiv.id.includes('thisweek-quadrant-') 
-                ? quadrantDiv.id.replace('thisweek-quadrant-', '')
-                : quadrantDiv.id.replace('quadrant-', '');
+            let quadrantName = quadrantDiv.id;
+            if (quadrantName.includes('thisweek-quadrant-')) {
+                quadrantName = quadrantName.replace('thisweek-quadrant-', '');
+            } else if (quadrantName.includes('finished-quadrant-')) {
+                quadrantName = quadrantName.replace('finished-quadrant-', '');
+            } else {
+                quadrantName = quadrantName.replace('quadrant-', '');
+            }
             
             listElement.classList.add('quadrant-drop-zone');
             
             listElement.addEventListener('dragover', (e) => {
-                // ✅ 允许 planning 和 thisweek 的任务拖拽
+                // ✅ 允许所有 section 的任务拖拽
                 if (draggedTask && !draggedCalendarTask && 
-                    (draggedTask.section === 'planning' || draggedTask.section === 'thisweek')) {
+                    (draggedTask.section === 'planning' || draggedTask.section === 'thisweek' || draggedTask.section === 'finished')) {
                     e.preventDefault();
                     listElement.classList.add('drag-over-quadrant');
                 }
@@ -3762,9 +3810,9 @@
                 e.preventDefault();
                 listElement.classList.remove('drag-over-quadrant');
                 
-                // ✅ 允许 planning 和 thisweek 的任务拖拽到不同象限
+                // ✅ 允许所有 section 的任务拖拽到不同象限
                 if (draggedTask && draggedFromQuadrant !== quadrantName && 
-                    (draggedTask.section === 'planning' || draggedTask.section === 'thisweek')) {
+                    (draggedTask.section === 'planning' || draggedTask.section === 'thisweek' || draggedTask.section === 'finished')) {
                     // Update task quadrant
                     const task = tasks.find(t => t.id === draggedTask.id);
                     if (task) {
