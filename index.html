@@ -821,10 +821,11 @@
                             <p id="userEmail" class="text-xs font-light text-gray-500">user@example.com</p>
                         </div>
                         <div class="flex items-center gap-2">
-                            <button onclick="syncData()" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded transition-colors" title="同步数据">
+                            <button onclick="syncData()" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded transition-colors" title="上传到云端">
                                 <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
+                            </button>
                         </button>
                             <button onclick="signOut()" class="bg-white text-red-600 text-sm font-medium px-3 py-1.5 rounded-md hover:bg-red-50 transition-colors">
                             登出
@@ -2169,33 +2170,94 @@
         }
         
         // ========================================================================
-        // Save data to Supabase with Reordering Cooldown Support
+        // Save data to Supabase with Debounced Upload (防抖上传)
         // ========================================================================
-        // isReordering: 是否是拖拽排序操作（需要更长的冷却期防止多端冲突）
+        // 自动保存：用户操作后1秒自动上传，避免频繁上传
         async function saveDataToSupabase(isReordering = false) {
             // ✅ 立即保存到本地存储（同步操作，确保数据不丢失）
             saveTasksToStorage();
             
-            // ✅ 记录本地保存时间和冷却期时长（冷却期内忽略实时推送，避免本地操作被覆盖）
-            // 拖拽排序：5分钟冷却期 | 其他操作：5秒冷却期
+            // ✅ 记录本地保存时间
             const saveTime = Date.now();
             lastLocalSaveTime = saveTime;
-            currentCooldownPeriod = isReordering ? 300000 : 5000; // 5分钟 or 5秒
-            console.log(`⏰ 设置冷却期: ${isReordering ? '5分钟(拖拽排序)' : '5秒(常规操作)'}`);
             
             if (!supabaseClient || !currentUser) {
                 console.log('⚠️ 未登录，仅保存到 localStorage')
                 return
             }
             
+            // ✅ 防抖上传：1秒内的多次操作只上传一次
+            clearTimeout(uploadTimer);
+            uploadTimer = setTimeout(async () => {
+                try {
+                    const updateTime = new Date().toISOString();
+                    console.log('💾 后台上传到 Supabase:', {
+                        tasks: tasks.length,
+                        calendarTasks: calendarTasks.length,
+                        timestamp: new Date(updateTime).toLocaleString()
+                    });
+                    
+                    const { data, error } = await supabaseClient.from('user_tasks')
+                        .upsert({
+                            user_id: currentUser.id,
+                            tasks: tasks,
+                            calendar_tasks: calendarTasks,
+                            updated_at: updateTime
+                        }, {
+                            onConflict: 'user_id'
+                        })
+                    
+                    if (error) throw error
+                    
+                    console.log('✅ 后台上传成功');
+                } catch (error) {
+                    console.error('❌ 后台上传失败:', error)
+                    // 不显示 toast，避免打扰用户
+                }
+            }, UPLOAD_DEBOUNCE);
+        }
+        
+        // Manual sync button - Force Upload to Supabase
+        // 强制上传模式：上传本地数据到云端
+        async function syncData() {
+            if (!supabaseClient || !currentUser) {
+                showToast('请先登录', 'error')
+                return
+            }
+            
             try {
-                const updateTime = new Date(saveTime).toISOString();
-                console.log('💾 保存到 Supabase:', {
-                    tasks: tasks.length,
-                    calendarTasks: calendarTasks.length,
-                    timestamp: new Date(saveTime).toLocaleString()
-                });
+                // ✅ 检查是否有待同步的远程更新
+                if (pendingRemoteUpdate) {
+                    // 有冲突：其他设备有新数据，但用户要上传本地数据
+                    const choice = confirm(
+                        '⚠️ 其他设备有更新的数据！\n\n' +
+                        '如果继续上传，会覆盖其他设备的修改。\n\n' +
+                        '点击"确定"继续上传（覆盖远程）\n' +
+                        '点击"取消"放弃上传（保留远程数据）\n\n' +
+                        '💡 提示：如果想要其他设备的数据，请取消后刷新页面（Cmd+R）'
+                    );
+                    
+                    if (!choice) {
+                        // 用户取消，不上传
+                        console.log('👤 用户取消上传');
+                        showToast('已取消上传', 'info');
+                        return;
+                    }
+                    
+                    // 用户确认，继续上传（会覆盖远程）
+                    console.log('👤 用户确认：上传并覆盖远程数据');
+                    pendingRemoteUpdate = null;
+                    syncBannerShown = false;
+                }
                 
+                // ✅ 强制上传本地数据到云端
+                showToast('正在上传到云端...', 'info')
+                console.log('📤 强制上传本地数据到 Supabase')
+                
+                // 取消防抖定时器，立即上传
+                clearTimeout(uploadTimer);
+                
+                const updateTime = new Date().toISOString();
                 const { data, error } = await supabaseClient.from('user_tasks')
                     .upsert({
                         user_id: currentUser.id,
@@ -2208,68 +2270,20 @@
                 
                 if (error) throw error
                 
-                console.log('✅ 保存成功，时间戳:', new Date(saveTime).toLocaleString());
-            } catch (error) {
-                console.error('❌ 保存失败:', error)
-                showToast('保存失败，请检查网络连接', 'error')
-            }
-        }
-        
-        // Manual sync button with smart conflict resolution
-        async function syncData() {
-            if (!supabaseClient || !currentUser) {
-                showToast('请先登录', 'error')
-                return
-            }
-            
-            try {
-                showToast('正在同步数据...', 'info')
+                // 更新本地时间戳
+                lastLocalSaveTime = new Date(updateTime).getTime();
                 
-                // Step 1: Check remote data timestamp
-                const { data: remoteData, error: fetchError } = await supabaseClient.from('user_tasks')
-                    .select('updated_at')
-                    .eq('user_id', currentUser.id)
-                    .single()
+                console.log('✅ 数据已上传到云端:', {
+                    tasks: tasks.length,
+                    calendarTasks: calendarTasks.length,
+                    timestamp: new Date(updateTime).toLocaleString()
+                });
                 
-                if (fetchError && fetchError.code !== 'PGRST116') {
-                    throw fetchError
-                }
-                
-                // Step 2: Compare timestamps
-                if (remoteData && remoteData.updated_at) {
-                    const remoteTime = new Date(remoteData.updated_at).getTime()
-                    const localTime = lastLocalSaveTime || 0
-                    
-                    console.log('🔍 同步检查:', {
-                        remote: new Date(remoteTime).toLocaleString(),
-                        local: new Date(localTime).toLocaleString()
-                    })
-                    
-                    if (remoteTime > localTime) {
-                        // Remote is newer, load it
-                        console.log('📥 远程数据更新，加载中...')
-                        await loadDataFromSupabase()
-                        showToast('✅ 已同步最新数据')
-                    } else if (localTime > remoteTime) {
-                        // Local is newer, save it
-                        console.log('📤 本地数据更新，上传中...')
-                        await saveDataToSupabase()
-                        showToast('✅ 已上传本地数据')
-                    } else {
-                        // Same, no action needed
-                        console.log('✅ 数据已是最新')
-                        showToast('✅ 数据已是最新')
-                    }
-                } else {
-                    // No remote data, save local
-                    console.log('📤 首次同步，上传本地数据...')
-                    await saveDataToSupabase()
-                    showToast('✅ 数据已同步到云端')
-                }
+                showToast('✅ 数据已上传到云端！', 'success')
                 
             } catch (error) {
-                console.error('❌ 同步失败:', error)
-                showToast('同步失败: ' + error.message, 'error')
+                console.error('❌ 上传失败:', error)
+                showToast('上传失败: ' + error.message, 'error')
             }
         }
         
@@ -2286,6 +2300,13 @@
         // 活跃检测阈值
         const INACTIVE_THRESHOLD = 120000;  // 2分钟无操作 = 非活跃状态
         const CONFLICT_THRESHOLD = 5000;    // 5秒内的操作可能冲突
+        const UPLOAD_DEBOUNCE = 1000;       // 1秒后上传（防抖）
+        const IDLE_SYNC_THRESHOLD = 10000;  // 10秒无操作 = 可以自动同步
+        
+        // 上传队列和待处理的远程更新
+        let uploadTimer = null;
+        let pendingRemoteUpdate = null;
+        let syncBannerShown = false;
         
         // 追踪用户活跃状态
         function trackUserActivity() {
@@ -2303,58 +2324,50 @@
         // ========================================================================
         
         /**
-         * 处理实时更新 - LWW (Last-Write-Wins) + 用户活跃检测
+         * 处理实时更新 - Notion 风格：延迟同步 + 用户控制
+         * 
+         * 新策略：
+         * 1. 用户空闲（10秒无操作）→ 自动同步
+         * 2. 用户活跃 → 缓存远程更新，显示提示，10秒后自动同步
+         * 3. 或用户点击"上传到云端"按钮立即同步
          */
         function handleRealtimeUpdate(remoteData) {
-            const remoteTime = new Date(remoteData.updated_at).getTime();
-            const localTime = lastLocalSaveTime || 0;
             const timeSinceUserAction = Date.now() - lastUserActionTime;
-            const timeSinceLastSave = Date.now() - lastLocalSaveTime;
             
-            console.log('🔍 实时更新分析:', {
-                remoteTime: new Date(remoteTime).toLocaleString(),
-                localTime: localTime ? new Date(localTime).toLocaleString() : '无',
+            console.log('🔍 实时更新接收:', {
+                remoteTimestamp: new Date(remoteData.updated_at).toLocaleString(),
                 timeSinceUserAction: `${Math.round(timeSinceUserAction / 1000)}秒`,
-                timeSinceLastSave: `${Math.round(timeSinceLastSave / 1000)}秒`,
-                cooldownPeriod: `${Math.round(currentCooldownPeriod / 1000)}秒`,
-                isUserActive: timeSinceUserAction < INACTIVE_THRESHOLD
+                userIdle: timeSinceUserAction > IDLE_SYNC_THRESHOLD
             });
             
-            // ✅ 策略0: 冷却期保护 → 本地刚保存，忽略远程更新（防止拖拽排序被覆盖）
-            if (timeSinceLastSave < currentCooldownPeriod) {
-                const remainingSeconds = Math.round((currentCooldownPeriod - timeSinceLastSave) / 1000);
-                console.log(`⏩ 冷却期保护：忽略远程更新（剩余 ${remainingSeconds} 秒）`);
-                return;
-            }
-            
-            // ✅ 策略1: 远程数据更旧 → 直接忽略
-            if (remoteTime <= localTime) {
-                console.log('⏩ 远程数据更旧，忽略 (LWW)');
-                return;
-            }
-            
-            // ✅ 策略2: 用户非活跃（2分钟无操作）→ 直接接受远程更新
-            if (timeSinceUserAction > INACTIVE_THRESHOLD) {
-                console.log('✅ 用户非活跃，接受远程更新');
+            // ✅ 策略1: 用户空闲（10秒无操作）→ 立即自动同步
+            if (timeSinceUserAction > IDLE_SYNC_THRESHOLD) {
+                console.log('✅ 用户空闲，立即自动同步');
                 applyRemoteUpdate(remoteData);
                 showToast('已同步其他设备的更新', 'info');
                 return;
             }
             
-            // ✅ 策略3: 用户活跃但最后操作超过5秒 → 安全接受
-            if (timeSinceUserAction > CONFLICT_THRESHOLD) {
-                console.log('✅ 用户5秒未操作，安全接受远程更新');
-                applyRemoteUpdate(remoteData);
-                return;
+            // ✅ 策略2: 用户活跃 → 缓存更新，延迟同步
+            console.log(`⏳ 用户活跃，延迟同步（${Math.round((IDLE_SYNC_THRESHOLD - timeSinceUserAction) / 1000)}秒后自动同步）`);
+            pendingRemoteUpdate = remoteData;
+            
+            // 显示提示（只显示一次，避免重复提示）
+            if (!syncBannerShown) {
+                syncBannerShown = true;
+                showToast('💡 其他设备有更新，10秒后自动同步\n或点击上传按钮立即同步', 'info');
+                
+                // 10秒后自动同步
+                setTimeout(() => {
+                    if (pendingRemoteUpdate) {
+                        console.log('⏰ 延迟时间到，自动同步');
+                        applyRemoteUpdate(pendingRemoteUpdate);
+                        pendingRemoteUpdate = null;
+                        syncBannerShown = false;
+                        showToast('已自动同步', 'info');
+                    }
+                }, IDLE_SYNC_THRESHOLD);
             }
-            
-            // ⚠️ 策略4: 用户刚操作（5秒内）+ 远程有更新 → 真正的冲突！
-            console.warn('⚠️ 检测到数据冲突！用户刚操作 + 远程更新');
-            console.warn('   本地时间:', new Date(localTime).toLocaleString());
-            console.warn('   远程时间:', new Date(remoteTime).toLocaleString());
-            console.warn('   用户最后操作:', `${Math.round(timeSinceUserAction / 1000)}秒前`);
-            
-            showConflictDialog(remoteData);
         }
         
         /**
@@ -2664,8 +2677,8 @@
             const currentHour = now.getHours();
             const currentMinute = now.getMinutes();
             
-            // Only show between 7 AM and 9 PM
-            if (currentHour < 7 || currentHour >= 21) {
+            // ✅ 更新为 6 AM 到 9 PM
+            if (currentHour < 6 || currentHour >= 21) {
                 return;
             }
             
@@ -2676,7 +2689,7 @@
             }
             
             // Calculate position
-            const hourIndex = currentHour - 7; // 7 AM is index 0
+            const hourIndex = currentHour - 6; // ✅ 6 AM is index 0 (之前是 - 7)
             const minutePercent = currentMinute / 60;
             const blockHeight = 60;
             const topPosition = (hourIndex + minutePercent) * blockHeight; // Position relative to calendarGrid
