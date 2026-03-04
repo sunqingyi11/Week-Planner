@@ -821,21 +821,35 @@
                             <p id="userEmail" class="text-xs font-light text-gray-500">user@example.com</p>
                         </div>
                         <div class="flex items-center gap-2">
+                            <!-- 云端状态指示器 -->
+                            <div class="flex items-center gap-1.5">
+                                <div id="cloudStatusDot" class="w-2 h-2 rounded-full bg-gray-400" title="云端连接状态"></div>
+                                <span id="cloudStatusText" class="text-xs text-gray-500">离线</span>
+                            </div>
+                            
+                            <!-- 最后同步时间 -->
+                            <div id="lastSyncTime" class="text-xs text-gray-400" title="最后一次成功上传到云端的时间">
+                                未同步
+                            </div>
+                            
+                            <!-- 上传到云端按钮 -->
                             <button onclick="syncData()" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded transition-colors" title="上传到云端">
                                 <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                 </svg>
                             </button>
-                        </button>
+                            
+                            <!-- 登出按钮 -->
                             <button onclick="signOut()" class="bg-white text-red-600 text-sm font-medium px-3 py-1.5 rounded-md hover:bg-red-50 transition-colors">
-                            登出
-                        </button>
+                                登出
+                            </button>
+                            
                             <!-- Collapse Sidebar Button -->
                             <button onclick="toggleSidebar()" class="sidebar-collapse-btn w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg transition-all" title="收起侧边栏">
                                 <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                                 </svg>
-                        </button>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1731,13 +1745,18 @@
                 loadTasksFromStorage()
                 renderTasks()
                 renderCalendarTasks()
+                updateCloudStatus('offline', 'Supabase 未连接，使用离线模式');
                 return
             }
             
             // ✅ Supabase已初始化，setupAuthListener()会处理剩余的认证逻辑
-            // 这里只加载本地数据作为初始显示（避免空白）
-            console.log('✅ Supabase ready, auth listener will handle session');
-            loadTasksFromStorage() // Load local data first for quick display
+            // 先尝试从 Supabase 加载（优先云端数据）
+            console.log('✅ Supabase ready, attempting to load from cloud first');
+            updateCloudStatus('online', 'Supabase 已连接');
+            
+            // 如果已登录，会在 setupAuthListener 中加载数据
+            // 这里只显示本地数据作为临时占位
+            loadTasksFromStorage()
             renderTasks()
             renderCalendarTasks()
         }
@@ -2121,6 +2140,14 @@
             if (!supabaseClient || !currentUser) return
             
             try {
+                // ① 先读取本地数据和时间戳
+                const localTimestamp = parseInt(localStorage.getItem('lastLocalSaveTimestamp')) || 0;
+                const localTasks = JSON.parse(localStorage.getItem('tasks')) || [];
+                const localCalendarTasks = JSON.parse(localStorage.getItem('calendarTasks')) || [];
+                
+                console.log('📥 开始加载数据，本地时间戳:', new Date(localTimestamp).toLocaleString());
+                
+                // ② 读取云端数据
                 const { data, error } = await supabaseClient.from('user_tasks')
                     .select('*')
                     .eq('user_id', currentUser.id)
@@ -2131,41 +2158,59 @@
                 }
                 
                 if (data) {
-                    // ✅ 记录远程数据的更新时间
-                    if (data.updated_at) {
-                        lastRemoteUpdateTime = new Date(data.updated_at).getTime();
-                        console.log('📅 远程数据时间:', new Date(lastRemoteUpdateTime).toLocaleString());
+                    // ✅ 云端有数据，比较时间戳
+                    const cloudTimestamp = new Date(data.updated_at).getTime();
+                    console.log('☁️ 云端数据时间戳:', new Date(cloudTimestamp).toLocaleString());
+                    console.log('🔍 时间差:', Math.round((localTimestamp - cloudTimestamp) / 1000), '秒');
+                    
+                    // ✅ 关键判断：本地更新？
+                    if (localTimestamp > cloudTimestamp) {
+                        // 本地数据更新！自动上传
+                        console.warn('⚠️ 本地数据更新，自动上传中...');
+                        
+                        await autoUploadLocalData(localTasks, localCalendarTasks, localTimestamp, cloudTimestamp);
+                        
+                    } else {
+                        // 云端数据更新或相同，使用云端
+                        console.log('✅ 使用云端数据');
+                        
+                        lastRemoteUpdateTime = cloudTimestamp;
+                        lastCloudSyncTime = cloudTimestamp;
+                        updateLastSyncTime();
+                        
+                        tasks = data.tasks || []
+                        calendarTasks = (data.calendar_tasks || []).map(ct => ({
+                            ...ct,
+                            duration: ct.duration || 60
+                        }))
+                        
+                        // 同步到本地存储
+                        saveTasksToStorage();
+                        
+                        renderTasks()
+                        renderCalendarTasks()
+                        showToast('数据已同步')
                     }
-                    
-                    tasks = data.tasks || []
-                    calendarTasks = (data.calendar_tasks || []).map(ct => ({
-                        ...ct,
-                        duration: ct.duration || 60 // Ensure all tasks have duration (default 60 min)
-                    }))
-                    
-                    // ✅ 同步到本地存储
-                    saveTasksToStorage();
-                    
-                    console.log('✅ 从Supabase加载数据:', {
-                        tasks: tasks.length,
-                        calendarTasks: calendarTasks.length,
-                        updatedAt: data.updated_at
-                    })
-                    renderTasks()
-                    renderCalendarTasks()
-                    showToast('数据已同步')
                 } else {
-                    console.log('ℹ️ Supabase没有数据，初始化为空')
-                    tasks = []
-                    calendarTasks = []
-                    renderTasks()
-                    renderCalendarTasks()
+                    // 云端无数据
+                    if (localTasks.length > 0 || localCalendarTasks.length > 0) {
+                        // 本地有数据，上传
+                        console.log('☁️ 云端无数据，上传本地数据');
+                        await autoUploadLocalData(localTasks, localCalendarTasks, localTimestamp, 0);
+                    } else {
+                        console.log('ℹ️ Supabase和本地都没有数据，初始化为空')
+                        tasks = []
+                        calendarTasks = []
+                        renderTasks()
+                        renderCalendarTasks()
+                    }
                 }
             } catch (error) {
                 console.error('Load data error:', error)
                 showToast('加载数据失败，使用本地数据', 'error')
                 loadTasksFromStorage() // Fallback
-                renderCalendarTasks() // 确保渲染日历任务
+                renderTasks();
+                renderCalendarTasks()
             }
         }
         
@@ -2190,6 +2235,8 @@
             clearTimeout(uploadTimer);
             uploadTimer = setTimeout(async () => {
                 try {
+                    updateCloudStatus('syncing', '后台同步中...');
+                    
                     const updateTime = new Date().toISOString();
                     console.log('💾 后台上传到 Supabase:', {
                         tasks: tasks.length,
@@ -2209,9 +2256,15 @@
                     
                     if (error) throw error
                     
+                    // ✅ 成功后更新时间戳
+                    lastCloudSyncTime = new Date(updateTime).getTime();
+                    updateCloudStatus('online', 'Supabase 在线');
+                    updateLastSyncTime();
+                    
                     console.log('✅ 后台上传成功');
                 } catch (error) {
                     console.error('❌ 后台上传失败:', error)
+                    updateCloudStatus('online', 'Supabase 在线但上传失败');
                     // 不显示 toast，避免打扰用户
                 }
             }, UPLOAD_DEBOUNCE);
@@ -2226,6 +2279,9 @@
             }
             
             try {
+                // 更新状态为同步中
+                updateCloudStatus('syncing', '正在上传到云端...');
+                
                 // ✅ 检查是否有待同步的远程更新
                 if (pendingRemoteUpdate) {
                     // 有冲突：其他设备有新数据，但用户要上传本地数据
@@ -2240,6 +2296,7 @@
                     if (!choice) {
                         // 用户取消，不上传
                         console.log('👤 用户取消上传');
+                        updateCloudStatus('online', 'Supabase 在线');
                         showToast('已取消上传', 'info');
                         return;
                     }
@@ -2270,8 +2327,14 @@
                 
                 if (error) throw error
                 
-                // 更新本地时间戳
-                lastLocalSaveTime = new Date(updateTime).getTime();
+                // ✅ 上传成功
+                const uploadTimestamp = new Date(updateTime).getTime();
+                lastLocalSaveTime = uploadTimestamp;
+                lastCloudSyncTime = uploadTimestamp;
+                
+                // 更新UI
+                updateCloudStatus('online', 'Supabase 在线');
+                updateLastSyncTime();
                 
                 console.log('✅ 数据已上传到云端:', {
                     tasks: tasks.length,
@@ -2279,11 +2342,29 @@
                     timestamp: new Date(updateTime).toLocaleString()
                 });
                 
-                showToast('✅ 数据已上传到云端！', 'success')
+                showToast('✅ 已成功上传到云端！', 'success')
                 
             } catch (error) {
                 console.error('❌ 上传失败:', error)
-                showToast('上传失败: ' + error.message, 'error')
+                
+                // 更新状态为在线但上传失败
+                updateCloudStatus('online', 'Supabase 在线但上传失败');
+                
+                // 显示错误和重试按钮
+                const retryChoice = confirm(
+                    '❌ 上传失败！\n\n' +
+                    `错误信息：${error.message}\n\n` +
+                    '点击"确定"重试上传\n' +
+                    '点击"取消"稍后再试'
+                );
+                
+                if (retryChoice) {
+                    // 用户选择重试
+                    console.log('🔄 用户选择重试上传');
+                    await syncData(); // 递归重试
+                } else {
+                    showToast('上传已取消，数据仅保存在本地', 'warning');
+                }
             }
         }
         
@@ -2307,11 +2388,246 @@
         let uploadTimer = null;
         let pendingRemoteUpdate = null;
         let syncBannerShown = false;
+        let lastCloudSyncTime = 0;  // 最后一次成功上传到云端的时间
+        let cloudStatus = 'offline'; // 'online' | 'offline' | 'syncing'
         
         // 追踪用户活跃状态
         function trackUserActivity() {
             lastUserActionTime = Date.now();
         }
+        
+        // 更新云端状态指示器
+        function updateCloudStatus(status, tooltip) {
+            cloudStatus = status;
+            const dot = document.getElementById('cloudStatusDot');
+            const text = document.getElementById('cloudStatusText');
+            
+            if (!dot || !text) return;
+            
+            switch(status) {
+                case 'online':
+                    dot.className = 'w-2 h-2 rounded-full bg-green-500';
+                    dot.title = tooltip || 'Supabase 在线';
+                    text.textContent = '在线';
+                    text.className = 'text-xs text-green-600';
+                    break;
+                case 'offline':
+                    dot.className = 'w-2 h-2 rounded-full bg-gray-400';
+                    dot.title = tooltip || 'Supabase 离线';
+                    text.textContent = '离线';
+                    text.className = 'text-xs text-gray-500';
+                    break;
+                case 'syncing':
+                    dot.className = 'w-2 h-2 rounded-full bg-blue-500 animate-pulse';
+                    dot.title = tooltip || '同步中...';
+                    text.textContent = '同步中';
+                    text.className = 'text-xs text-blue-600';
+                    break;
+            }
+        }
+        
+        // 更新最后同步时间显示
+        function updateLastSyncTime() {
+            const el = document.getElementById('lastSyncTime');
+            if (!el) return;
+            
+            if (!lastCloudSyncTime) {
+                el.textContent = '未同步';
+                el.title = '还未成功上传到云端';
+                return;
+            }
+            
+            const now = Date.now();
+            const diff = now - lastCloudSyncTime;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+            
+            let timeText = '';
+            if (days > 0) {
+                timeText = `${days}天前`;
+            } else if (hours > 0) {
+                timeText = `${hours}小时前`;
+            } else if (minutes > 0) {
+                timeText = `${minutes}分钟前`;
+            } else {
+                timeText = '刚刚';
+            }
+            
+            const fullTime = new Date(lastCloudSyncTime).toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            
+            el.textContent = timeText;
+            el.title = `最后成功上传：${fullTime}`;
+        }
+        
+        // 自动上传本地数据（带进度和可中断）
+        let uploadAborted = false;
+        
+        async function autoUploadLocalData(localTasks, localCalendarTasks, localTimestamp, cloudTimestamp) {
+            uploadAborted = false;
+            
+            // 计算时间差
+            const timeDiff = Math.round((localTimestamp - cloudTimestamp) / 1000);
+            const localTimeStr = new Date(localTimestamp).toLocaleString('zh-CN', {
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            const cloudTimeStr = cloudTimestamp > 0 ? new Date(cloudTimestamp).toLocaleString('zh-CN', {
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            }) : '无';
+            
+            // 显示自定义弹窗
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center';
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <h3 class="text-lg font-semibold text-gray-900">检测到本地有更新数据</h3>
+                    </div>
+                    <div class="text-sm text-gray-600 mb-4 space-y-2">
+                        <p>📱 本地数据：${localTimeStr}（${localTasks.length}任务 + ${localCalendarTasks.length}日程）</p>
+                        <p>☁️ 云端数据：${cloudTimeStr}</p>
+                        <p class="text-blue-600 font-medium">⏱️ 本地数据新 ${timeDiff} 秒</p>
+                        <p class="mt-3">正在自动为您上传并同步...</p>
+                    </div>
+                    <button id="abortUploadBtn" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded transition-colors">
+                        停止上传
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // 绑定停止按钮
+            const abortBtn = document.getElementById('abortUploadBtn');
+            abortBtn.onclick = () => {
+                uploadAborted = true;
+                abortBtn.textContent = '已停止';
+                abortBtn.disabled = true;
+                abortBtn.className = 'w-full bg-gray-400 text-gray-600 font-medium py-2 px-4 rounded cursor-not-allowed';
+            };
+            
+            try {
+                // 更新状态
+                updateCloudStatus('syncing', '自动上传中...');
+                
+                // 等待一小段时间让用户看到提示（可中断）
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                if (uploadAborted) {
+                    throw new Error('用户中止上传');
+                }
+                
+                // 上传数据
+                tasks = localTasks;
+                calendarTasks = localCalendarTasks;
+                
+                const updateTime = new Date().toISOString();
+                const { data, error } = await supabaseClient.from('user_tasks')
+                    .upsert({
+                        user_id: currentUser.id,
+                        tasks: tasks,
+                        calendar_tasks: calendarTasks,
+                        updated_at: updateTime
+                    }, {
+                        onConflict: 'user_id'
+                    });
+                
+                if (error) throw error;
+                
+                if (uploadAborted) {
+                    throw new Error('用户中止上传');
+                }
+                
+                // 上传成功
+                const uploadTimestamp = new Date(updateTime).getTime();
+                lastLocalSaveTime = uploadTimestamp;
+                lastCloudSyncTime = uploadTimestamp;
+                
+                // 更新弹窗内容 - 成功
+                modal.querySelector('div.bg-white').innerHTML = `
+                    <div class="text-center">
+                        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+                            <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">✅ 更新完成！</h3>
+                        <p class="text-sm text-gray-600 mb-4">本地数据已成功上传并同步</p>
+                        <div class="text-xs text-gray-500">
+                            <p>上传: ${localTasks.length} 任务 + ${localCalendarTasks.length} 日程</p>
+                            <p class="mt-1">弹窗将自动关闭...</p>
+                        </div>
+                    </div>
+                `;
+                
+                // 更新UI
+                updateCloudStatus('online', 'Supabase 在线');
+                updateLastSyncTime();
+                renderTasks();
+                renderCalendarTasks();
+                
+                console.log('✅ 自动上传成功:', {
+                    tasks: tasks.length,
+                    calendarTasks: calendarTasks.length,
+                    timestamp: new Date(updateTime).toLocaleString()
+                });
+                
+                // 2秒后自动关闭
+                setTimeout(() => {
+                    document.body.removeChild(modal);
+                    showToast('✅ 本地数据已上传到云端', 'success');
+                }, 2000);
+                
+            } catch (error) {
+                console.error('❌ 自动上传失败:', error);
+                
+                // 更新弹窗内容 - 失败
+                modal.querySelector('div.bg-white').innerHTML = `
+                    <div class="text-center">
+                        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                            <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">❌ 上传失败</h3>
+                        <p class="text-sm text-gray-600 mb-4">${error.message === '用户中止上传' ? '您已停止上传' : '网络错误: ' + error.message}</p>
+                        <div class="flex gap-2">
+                            <button onclick="this.closest('.fixed').remove(); location.reload();" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded transition-colors">
+                                使用云端数据
+                            </button>
+                            <button onclick="this.closest('.fixed').remove(); syncData();" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition-colors">
+                                重试上传
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                updateCloudStatus('online', 'Supabase 在线但上传失败');
+                
+                // 如果是用户中止，使用云端数据
+                if (error.message === '用户中止上传') {
+                    loadTasksFromStorage();
+                    renderTasks();
+                    renderCalendarTasks();
+                }
+            }
+        }
+        
+        // 每分钟更新一次显示的时间
+        setInterval(updateLastSyncTime, 60000);
         
         // 监听所有用户交互
         document.addEventListener('click', trackUserActivity);
@@ -4925,6 +5241,8 @@
         function saveTasksToStorage() {
             localStorage.setItem('tasks', JSON.stringify(tasks));
             localStorage.setItem('calendarTasks', JSON.stringify(calendarTasks));
+            // ✅ 保存时间戳（精确到秒）
+            localStorage.setItem('lastLocalSaveTimestamp', Date.now().toString());
         }
         
         function loadTasksFromStorage() {
