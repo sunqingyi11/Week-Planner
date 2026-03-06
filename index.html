@@ -839,6 +839,13 @@
                                 </svg>
                             </button>
                             
+                            <!-- 查看同步状态按钮 -->
+                            <button onclick="showSyncStatusModal()" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded transition-colors" title="查看同步状态">
+                                <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </button>
+                            
                             <!-- 登出按钮 -->
                             <button onclick="signOut()" class="bg-white text-red-600 text-sm font-medium px-3 py-1.5 rounded-md hover:bg-red-50 transition-colors">
                                 登出
@@ -1749,6 +1756,45 @@
                 return
             }
             
+            // ✅ 检查上次同步状态
+            const lastUploadStatus = localStorage.getItem('lastUploadStatus');
+            const lastUploadError = localStorage.getItem('lastUploadError');
+            
+            if (lastUploadStatus === 'failed' && lastUploadError) {
+                // 上次上传失败，显示持久化警告
+                console.warn('⚠️ 检测到上次上传失败:', lastUploadError);
+                
+                const errorDiv = document.createElement('div');
+                errorDiv.id = 'persistentUploadWarning';
+                errorDiv.className = 'fixed top-4 right-4 bg-white shadow-lg rounded-lg p-4 z-[10000] border-l-4 border-red-500 max-w-md';
+                errorDiv.innerHTML = `
+                    <div class="flex items-start gap-3">
+                        <svg class="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div class="flex-1">
+                            <div class="font-semibold text-gray-900">❌ 上次上传失败</div>
+                            <div class="text-sm text-gray-600 mb-2">错误：${lastUploadError}</div>
+                            <div class="text-xs text-red-600 mb-3">⚠️ 你的数据可能未同步到云端！</div>
+                            <div class="flex gap-2">
+                                <button onclick="syncData(); this.closest('.fixed').remove();" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded">
+                                    立即上传
+                                </button>
+                                <button onclick="localStorage.removeItem('lastUploadStatus'); localStorage.removeItem('lastUploadError'); this.closest('.fixed').remove();" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm rounded">
+                                    稍后再说
+                                </button>
+                            </div>
+                        </div>
+                        <button onclick="localStorage.removeItem('lastUploadStatus'); localStorage.removeItem('lastUploadError'); this.closest('.fixed').remove();" class="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                document.body.appendChild(errorDiv);
+            }
+            
             // ✅ Supabase已初始化，setupAuthListener()会处理剩余的认证逻辑
             // 先尝试从 Supabase 加载（优先云端数据）
             console.log('✅ Supabase ready, attempting to load from cloud first');
@@ -2244,7 +2290,8 @@
                         timestamp: new Date(updateTime).toLocaleString()
                     });
                     
-                    const { data, error } = await supabaseClient.from('user_tasks')
+                    // ✅ 设置30秒超时
+                    const uploadPromise = supabaseClient.from('user_tasks')
                         .upsert({
                             user_id: currentUser.id,
                             tasks: tasks,
@@ -2252,7 +2299,13 @@
                             updated_at: updateTime
                         }, {
                             onConflict: 'user_id'
-                        })
+                        });
+                    
+                    const timeoutPromise = new Promise((_, reject) => {
+                        setTimeout(() => reject(new Error('后台上传超时（30秒）')), 30000);
+                    });
+                    
+                    const { data, error } = await Promise.race([uploadPromise, timeoutPromise]);
                     
                     if (error) throw error
                     
@@ -2261,11 +2314,47 @@
                     updateCloudStatus('online', 'Supabase 在线');
                     updateLastSyncTime();
                     
+                    // 保存成功状态
+                    localStorage.setItem('lastUploadStatus', 'success');
+                    localStorage.setItem('lastUploadTime', lastCloudSyncTime.toString());
+                    
                     console.log('✅ 后台上传成功');
                 } catch (error) {
                     console.error('❌ 后台上传失败:', error)
-                    updateCloudStatus('online', 'Supabase 在线但上传失败');
-                    // 不显示 toast，避免打扰用户
+                    
+                    // 保存失败状态
+                    localStorage.setItem('lastUploadStatus', 'failed');
+                    localStorage.setItem('lastUploadError', error.message);
+                    
+                    updateCloudStatus('offline', `同步失败: ${error.message}`);
+                    
+                    // ⚠️ 显示持久化的失败提示
+                    if (!document.getElementById('backgroundUploadError')) {
+                        const errorDiv = document.createElement('div');
+                        errorDiv.id = 'backgroundUploadError';
+                        errorDiv.className = 'fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 z-[10000] border-l-4 border-orange-500 max-w-md';
+                        errorDiv.innerHTML = `
+                            <div class="flex items-start gap-3">
+                                <svg class="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                </svg>
+                                <div class="flex-1">
+                                    <div class="font-semibold text-gray-900">⚠️ 后台同步失败</div>
+                                    <div class="text-sm text-gray-600 mb-2">错误：${error.message}</div>
+                                    <div class="text-xs text-orange-600 mb-3">数据已保存到本地，请点击"上传到云端"按钮重试</div>
+                                    <button onclick="this.closest('.fixed').remove();" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm rounded">
+                                        知道了
+                                    </button>
+                                </div>
+                                <button onclick="this.closest('.fixed').remove();" class="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        `;
+                        document.body.appendChild(errorDiv);
+                    }
                 }
             }, UPLOAD_DEBOUNCE);
         }
@@ -2273,10 +2362,53 @@
         // Manual sync button - Force Upload to Supabase
         // 强制上传模式：上传本地数据到云端
         async function syncData() {
+            console.log('🔵 ========== syncData() 开始 ==========');
+            console.log('📊 当前状态:', {
+                supabaseClient: !!supabaseClient,
+                currentUser: currentUser ? currentUser.id : null,
+                tasks: tasks ? tasks.length : 0,
+                calendarTasks: calendarTasks ? calendarTasks.length : 0
+            });
+            
+            // ✅ 直接显示诊断弹窗
+            const diagnosticInfo = `
+🔍 系统诊断信息：
+━━━━━━━━━━━━━━━━━━
+✅ Supabase 客户端: ${!!supabaseClient ? '已初始化' : '❌ 未初始化'}
+✅ 当前用户: ${currentUser ? currentUser.id.substring(0, 8) + '...' : '❌ 未登录'}
+✅ 任务数量: ${tasks ? tasks.length : 0}
+✅ 日程数量: ${calendarTasks ? calendarTasks.length : 0}
+━━━━━━━━━━━━━━━━━━
+
+${!supabaseClient ? '❌ 错误：Supabase 未连接\n' : ''}${!currentUser ? '❌ 错误：用户未登录\n' : ''}
+${supabaseClient && currentUser ? '✅ 准备上传...' : ''}
+            `.trim();
+            
+            alert(diagnosticInfo);
+            
             if (!supabaseClient || !currentUser) {
-                showToast('请先登录', 'error')
+                console.error('❌ 无法上传: supabaseClient 或 currentUser 未初始化');
                 return
             }
+            
+            // ✅ 如果通过检查，显示"正在上传"
+            alert('✅ 检查通过！\n\n现在开始上传到 Supabase...\n点击确定继续');
+            console.log('📤 开始上传到 Supabase...');
+            
+            // 创建持久化的上传状态指示器
+            const uploadStatusDiv = document.createElement('div');
+            uploadStatusDiv.id = 'uploadStatusIndicator';
+            uploadStatusDiv.className = 'fixed top-4 right-4 bg-white shadow-lg rounded-lg p-4 z-[10000] border-l-4 border-blue-500';
+            uploadStatusDiv.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                    <div>
+                        <div class="font-semibold text-gray-900">正在上传到云端...</div>
+                        <div class="text-sm text-gray-600">请保持页面打开，预计需要 <span id="uploadEta">5</span> 秒</div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(uploadStatusDiv);
             
             try {
                 // 更新状态为同步中
@@ -2284,7 +2416,9 @@
                 
                 // ✅ 检查是否有待同步的远程更新
                 if (pendingRemoteUpdate) {
-                    // 有冲突：其他设备有新数据，但用户要上传本地数据
+                    // 移除状态指示器
+                    document.body.removeChild(uploadStatusDiv);
+                    
                     const choice = confirm(
                         '⚠️ 其他设备有更新的数据！\n\n' +
                         '如果继续上传，会覆盖其他设备的修改。\n\n' +
@@ -2294,27 +2428,35 @@
                     );
                     
                     if (!choice) {
-                        // 用户取消，不上传
                         console.log('👤 用户取消上传');
                         updateCloudStatus('online', 'Supabase 在线');
-                        showToast('已取消上传', 'info');
+                        showToast('已取消上传', 'info', 3000);
                         return;
                     }
                     
-                    // 用户确认，继续上传（会覆盖远程）
                     console.log('👤 用户确认：上传并覆盖远程数据');
                     pendingRemoteUpdate = null;
                     syncBannerShown = false;
+                    
+                    // 重新创建状态指示器
+                    document.body.appendChild(uploadStatusDiv);
                 }
                 
-                // ✅ 强制上传本地数据到云端
-                showToast('正在上传到云端...', 'info')
-                console.log('📤 强制上传本地数据到 Supabase')
+                // ✅ 设置30秒超时
+                const uploadTimeout = setTimeout(() => {
+                    throw new Error('上传超时（30秒）');
+                }, 30000);
                 
                 // 取消防抖定时器，立即上传
                 clearTimeout(uploadTimer);
                 
                 const updateTime = new Date().toISOString();
+                
+                console.log('📤 开始上传，数据大小:', {
+                    tasks: tasks.length,
+                    calendarTasks: calendarTasks.length
+                });
+                
                 const { data, error } = await supabaseClient.from('user_tasks')
                     .upsert({
                         user_id: currentUser.id,
@@ -2324,6 +2466,9 @@
                     }, {
                         onConflict: 'user_id'
                     })
+                
+                // 清除超时
+                clearTimeout(uploadTimeout);
                 
                 if (error) throw error
                 
@@ -2336,13 +2481,41 @@
                 updateCloudStatus('online', 'Supabase 在线');
                 updateLastSyncTime();
                 
+                // 保存成功状态到 localStorage
+                localStorage.setItem('lastUploadStatus', 'success');
+                localStorage.setItem('lastUploadTime', uploadTimestamp.toString());
+                
                 console.log('✅ 数据已上传到云端:', {
                     tasks: tasks.length,
                     calendarTasks: calendarTasks.length,
                     timestamp: new Date(updateTime).toLocaleString()
                 });
                 
-                showToast('✅ 已成功上传到云端！', 'success')
+                // 更新状态指示器为成功
+                uploadStatusDiv.className = 'fixed top-4 right-4 bg-white shadow-lg rounded-lg p-4 z-[10000] border-l-4 border-green-500';
+                uploadStatusDiv.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <div>
+                            <div class="font-semibold text-gray-900">✅ 上传成功！</div>
+                            <div class="text-sm text-gray-600">数据已安全保存到云端（${tasks.length} 任务 + ${calendarTasks.length} 日程）</div>
+                        </div>
+                        <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-gray-400 hover:text-gray-600">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                
+                // 5秒后自动关闭成功提示
+                setTimeout(() => {
+                    if (document.body.contains(uploadStatusDiv)) {
+                        document.body.removeChild(uploadStatusDiv);
+                    }
+                }, 5000);
                 
             } catch (error) {
                 console.error('❌ 上传失败:', error)
@@ -2350,21 +2523,39 @@
                 // 更新状态为在线但上传失败
                 updateCloudStatus('online', 'Supabase 在线但上传失败');
                 
-                // 显示错误和重试按钮
-                const retryChoice = confirm(
-                    '❌ 上传失败！\n\n' +
-                    `错误信息：${error.message}\n\n` +
-                    '点击"确定"重试上传\n' +
-                    '点击"取消"稍后再试'
-                );
+                // 保存失败状态到 localStorage
+                localStorage.setItem('lastUploadStatus', 'failed');
+                localStorage.setItem('lastUploadError', error.message);
                 
-                if (retryChoice) {
-                    // 用户选择重试
-                    console.log('🔄 用户选择重试上传');
-                    await syncData(); // 递归重试
-                } else {
-                    showToast('上传已取消，数据仅保存在本地', 'warning');
-                }
+                // 更新状态指示器为失败（持久化，不自动消失）
+                uploadStatusDiv.className = 'fixed top-4 right-4 bg-white shadow-lg rounded-lg p-4 z-[10000] border-l-4 border-red-500';
+                uploadStatusDiv.innerHTML = `
+                    <div class="flex items-start gap-3">
+                        <svg class="h-5 w-5 text-red-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div class="flex-1">
+                            <div class="font-semibold text-gray-900">❌ 上传失败</div>
+                            <div class="text-sm text-gray-600 mb-2">错误：${error.message}</div>
+                            <div class="text-xs text-red-600 mb-3">⚠️ 数据仅保存在本地，请重试上传！</div>
+                            <div class="flex gap-2">
+                                <button onclick="syncData(); this.closest('.fixed').remove();" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded">
+                                    重试上传
+                                </button>
+                                <button onclick="this.closest('.fixed').remove();" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm rounded">
+                                    稍后再试
+                                </button>
+                            </div>
+                        </div>
+                        <button onclick="this.parentElement.parentElement.remove()" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                
+                // 失败提示不自动消失！用户必须手动关闭
             }
         }
         
