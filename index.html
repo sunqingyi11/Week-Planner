@@ -1636,13 +1636,15 @@
                         console.log('🔨 Creating Supabase client...');
                         
                         // ✅ 配置会话持久化和自动刷新（延长登录有效期）
+                        // 🔧 添加 flowType: 'pkce' 避免多标签页锁冲突
                         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
                             auth: {
                                 persistSession: true,        // 持久化会话到localStorage
                                 autoRefreshToken: true,      // 自动刷新token
                                 detectSessionInUrl: true,    // 检测URL中的OAuth回调
                                 storage: window.localStorage, // 使用localStorage存储
-                                storageKey: 'supabase.auth.token' // 存储键名
+                                storageKey: 'supabase.auth.token', // 存储键名
+                                flowType: 'pkce'            // 🔧 使用PKCE流程，避免锁冲突
                             }
                         })
                         
@@ -2363,6 +2365,14 @@
         // 强制上传模式：上传本地数据到云端
         async function syncData() {
             console.log('🔵 ========== syncData() 开始 ==========');
+            
+            // 🔒 检查是否正在上传
+            if (isUploading) {
+                alert('⚠️ 正在上传中，请稍等！\n\n请不要重复点击上传按钮。');
+                console.warn('⚠️ 上传已在进行中，忽略重复调用');
+                return;
+            }
+            
             console.log('📊 当前状态:', {
                 supabaseClient: !!supabaseClient,
                 currentUser: currentUser ? currentUser.id : null,
@@ -2394,6 +2404,9 @@ ${supabaseClient && currentUser ? '✅ 准备上传...' : ''}
             // ✅ 如果通过检查，显示"正在上传"
             alert('✅ 检查通过！\n\n现在开始上传到 Supabase...\n点击确定继续');
             console.log('📤 开始上传到 Supabase...');
+            
+            // 🔒 设置上传锁
+            isUploading = true;
             
             // 创建持久化的上传状态指示器
             const uploadStatusDiv = document.createElement('div');
@@ -2457,20 +2470,51 @@ ${supabaseClient && currentUser ? '✅ 准备上传...' : ''}
                     calendarTasks: calendarTasks.length
                 });
                 
-                const { data, error } = await supabaseClient.from('user_tasks')
-                    .upsert({
-                        user_id: currentUser.id,
-                        tasks: tasks,
-                        calendar_tasks: calendarTasks,
-                        updated_at: updateTime
-                    }, {
-                        onConflict: 'user_id'
-                    })
+                // 🔧 重试逻辑：如果遇到 AbortError 自动重试一次
+                let uploadError = null;
+                let uploadData = null;
+                
+                try {
+                    const { data, error } = await supabaseClient.from('user_tasks')
+                        .upsert({
+                            user_id: currentUser.id,
+                            tasks: tasks,
+                            calendar_tasks: calendarTasks,
+                            updated_at: updateTime
+                        }, {
+                            onConflict: 'user_id'
+                        });
+                    
+                    uploadData = data;
+                    uploadError = error;
+                } catch (err) {
+                    // 捕获 AbortError 并重试
+                    if (err.message && err.message.includes('Lock broken')) {
+                        console.warn('⚠️ 检测到锁冲突，等待 1 秒后重试...');
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
+                        const { data, error } = await supabaseClient.from('user_tasks')
+                            .upsert({
+                                user_id: currentUser.id,
+                                tasks: tasks,
+                                calendar_tasks: calendarTasks,
+                                updated_at: updateTime
+                            }, {
+                                onConflict: 'user_id'
+                            });
+                        
+                        uploadData = data;
+                        uploadError = error;
+                        console.log('✅ 重试成功');
+                    } else {
+                        throw err;
+                    }
+                }
                 
                 // 清除超时
                 clearTimeout(uploadTimeout);
                 
-                if (error) throw error
+                if (uploadError) throw uploadError
                 
                 // ✅ 上传成功
                 const uploadTimestamp = new Date(updateTime).getTime();
@@ -2556,6 +2600,10 @@ ${supabaseClient && currentUser ? '✅ 准备上传...' : ''}
                 `;
                 
                 // 失败提示不自动消失！用户必须手动关闭
+            } finally {
+                // 🔓 释放上传锁
+                isUploading = false;
+                console.log('🔓 上传锁已释放');
             }
         }
         
@@ -2581,6 +2629,7 @@ ${supabaseClient && currentUser ? '✅ 准备上传...' : ''}
         let syncBannerShown = false;
         let lastCloudSyncTime = 0;  // 最后一次成功上传到云端的时间
         let cloudStatus = 'offline'; // 'online' | 'offline' | 'syncing'
+        let isUploading = false;  // 🔒 防止重复上传的锁
         
         // 追踪用户活跃状态
         function trackUserActivity() {
