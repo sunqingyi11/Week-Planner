@@ -2285,34 +2285,18 @@
                 try {
                     updateCloudStatus('syncing', '后台同步中...');
                     
-                    const updateTime = new Date().toISOString();
                     console.log('💾 后台上传到 Supabase:', {
                         tasks: tasks.length,
-                        calendarTasks: calendarTasks.length,
-                        timestamp: new Date(updateTime).toLocaleString()
+                        calendarTasks: calendarTasks.length
                     });
                     
-                    // ✅ 设置30秒超时
-                    const uploadPromise = supabaseClient.from('user_tasks')
-                        .upsert({
-                            user_id: currentUser.id,
-                            tasks: tasks,
-                            calendar_tasks: calendarTasks,
-                            updated_at: updateTime
-                        }, {
-                            onConflict: 'user_id'
-                        });
+                    // 🔧 使用统一的 REST API 上传函数
+                    const result = await uploadToSupabaseViaRestAPI(tasks, calendarTasks, currentUser.id);
                     
-                    const timeoutPromise = new Promise((_, reject) => {
-                        setTimeout(() => reject(new Error('后台上传超时（30秒）')), 30000);
-                    });
-                    
-                    const { data, error } = await Promise.race([uploadPromise, timeoutPromise]);
-                    
-                    if (error) throw error
+                    if (result.error) throw result.error;
                     
                     // ✅ 成功后更新时间戳
-                    lastCloudSyncTime = new Date(updateTime).getTime();
+                    lastCloudSyncTime = new Date(result.timestamp).getTime();
                     updateCloudStatus('online', 'Supabase 在线');
                     updateLastSyncTime();
                     
@@ -2455,63 +2439,21 @@ ${supabaseClient && currentUser ? '✅ 准备上传...' : ''}
                     document.body.appendChild(uploadStatusDiv);
                 }
                 
-                // ✅ 设置30秒超时
-                const uploadTimeout = setTimeout(() => {
-                    throw new Error('上传超时（30秒）');
-                }, 30000);
-                
                 // 取消防抖定时器，立即上传
                 clearTimeout(uploadTimer);
-                
-                const updateTime = new Date().toISOString();
                 
                 console.log('📤 开始上传，数据大小:', {
                     tasks: tasks.length,
                     calendarTasks: calendarTasks.length
                 });
                 
-                // 🔧 新方案：使用原始 REST API 绕过 Auth 锁冲突
-                console.log('🚀 使用 REST API 直接上传（绕过 Auth 锁）');
+                // 🔧 使用统一的 REST API 上传函数
+                const result = await uploadToSupabaseViaRestAPI(tasks, calendarTasks, currentUser.id);
                 
-                // 获取当前 session token
-                const { data: sessionData } = await supabaseClient.auth.getSession();
-                if (!sessionData || !sessionData.session) {
-                    throw new Error('无法获取登录会话，请重新登录');
-                }
-                
-                const accessToken = sessionData.session.access_token;
-                
-                // 使用原始 fetch + JWT 直接调用 Supabase REST API
-                const response = await fetch(`${SUPABASE_URL}/rest/v1/user_tasks`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'apikey': SUPABASE_ANON_KEY,
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Prefer': 'resolution=merge-duplicates'
-                    },
-                    body: JSON.stringify({
-                        user_id: currentUser.id,
-                        tasks: tasks,
-                        calendar_tasks: calendarTasks,
-                        updated_at: updateTime
-                    })
-                });
-                
-                // 清除超时
-                clearTimeout(uploadTimeout);
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('❌ REST API 错误:', errorText);
-                    throw new Error(`上传失败 (${response.status}): ${errorText}`);
-                }
-                
-                const uploadData = await response.json();
-                console.log('✅ REST API 上传成功:', uploadData);
+                if (result.error) throw result.error;
                 
                 // ✅ 上传成功
-                const uploadTimestamp = new Date(updateTime).getTime();
+                const uploadTimestamp = new Date(result.timestamp).getTime();
                 lastLocalSaveTime = uploadTimestamp;
                 lastCloudSyncTime = uploadTimestamp;
                 
@@ -2526,7 +2468,7 @@ ${supabaseClient && currentUser ? '✅ 准备上传...' : ''}
                 console.log('✅ 数据已上传到云端:', {
                     tasks: tasks.length,
                     calendarTasks: calendarTasks.length,
-                    timestamp: new Date(updateTime).toLocaleString()
+                    timestamp: new Date(result.timestamp).toLocaleString()
                 });
                 
                 // 更新状态指示器为成功
@@ -2624,6 +2566,76 @@ ${supabaseClient && currentUser ? '✅ 准备上传...' : ''}
         let lastCloudSyncTime = 0;  // 最后一次成功上传到云端的时间
         let cloudStatus = 'offline'; // 'online' | 'offline' | 'syncing'
         let isUploading = false;  // 🔒 防止重复上传的锁
+        
+        // 🔧 统一的 REST API 上传函数（绕过 Auth 锁）
+        async function uploadToSupabaseViaRestAPI(tasksData, calendarTasksData, userId) {
+            console.log('🚀 使用 REST API 上传（绕过 Auth 锁）');
+            
+            // 直接从 localStorage 读取 token，完全不调用 Auth API
+            const supabaseAuthKey = 'supabase.auth.token';
+            const authDataStr = localStorage.getItem(supabaseAuthKey);
+            
+            if (!authDataStr) {
+                throw new Error('未找到登录信息，请重新登录');
+            }
+            
+            let accessToken;
+            try {
+                const authData = JSON.parse(authDataStr);
+                accessToken = authData.access_token || authData.currentSession?.access_token;
+                
+                if (!accessToken) {
+                    throw new Error('登录信息格式错误');
+                }
+                
+                console.log('✅ 成功获取 token (长度:', accessToken.length, ')');
+            } catch (parseError) {
+                console.error('❌ 解析登录信息失败:', parseError);
+                throw new Error('登录信息已损坏，请重新登录');
+            }
+            
+            // 准备数据
+            const updateTime = new Date().toISOString();
+            const payload = {
+                user_id: userId,
+                tasks: tasksData,
+                calendar_tasks: calendarTasksData,
+                updated_at: updateTime
+            };
+            
+            // 使用原始 fetch + JWT 直接调用 Supabase REST API
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/user_tasks`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Prefer': 'resolution=merge-duplicates'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ REST API 错误:', errorText);
+                
+                // 检查是否是 token 过期
+                if (response.status === 401) {
+                    throw new Error('登录已过期，请重新登录（Token expired）');
+                }
+                
+                throw new Error(`上传失败 (${response.status}): ${errorText}`);
+            }
+            
+            const result = await response.json();
+            console.log('✅ REST API 上传成功');
+            
+            return {
+                data: result,
+                error: null,
+                timestamp: updateTime
+            };
+        }
         
         // 追踪用户活跃状态
         function trackUserActivity() {
@@ -2768,25 +2780,17 @@ ${supabaseClient && currentUser ? '✅ 准备上传...' : ''}
                 tasks = localTasks;
                 calendarTasks = localCalendarTasks;
                 
-                const updateTime = new Date().toISOString();
-                const { data, error } = await supabaseClient.from('user_tasks')
-                    .upsert({
-                        user_id: currentUser.id,
-                        tasks: tasks,
-                        calendar_tasks: calendarTasks,
-                        updated_at: updateTime
-                    }, {
-                        onConflict: 'user_id'
-                    });
+                // 🔧 使用统一的 REST API 上传函数
+                const result = await uploadToSupabaseViaRestAPI(localTasks, localCalendarTasks, currentUser.id);
                 
-                if (error) throw error;
+                if (result.error) throw result.error;
                 
                 if (uploadAborted) {
                     throw new Error('用户中止上传');
                 }
                 
                 // 上传成功
-                const uploadTimestamp = new Date(updateTime).getTime();
+                const uploadTimestamp = new Date(result.timestamp).getTime();
                 lastLocalSaveTime = uploadTimestamp;
                 lastCloudSyncTime = uploadTimestamp;
                 
@@ -2816,7 +2820,7 @@ ${supabaseClient && currentUser ? '✅ 准备上传...' : ''}
                 console.log('✅ 自动上传成功:', {
                     tasks: tasks.length,
                     calendarTasks: calendarTasks.length,
-                    timestamp: new Date(updateTime).toLocaleString()
+                    timestamp: new Date(result.timestamp).toLocaleString()
                 });
                 
                 // 2秒后自动关闭
@@ -2862,6 +2866,58 @@ ${supabaseClient && currentUser ? '✅ 准备上传...' : ''}
         
         // 每分钟更新一次显示的时间
         setInterval(updateLastSyncTime, 60000);
+        
+        // 🔧 每 10 分钟检查一次 Token 是否即将过期
+        setInterval(() => {
+            if (!currentUser) return;
+            
+            const authDataStr = localStorage.getItem('supabase.auth.token');
+            if (!authDataStr) return;
+            
+            try {
+                const authData = JSON.parse(authDataStr);
+                const expiresAt = authData.expires_at || authData.currentSession?.expires_at;
+                
+                if (expiresAt) {
+                    const expiresTime = expiresAt * 1000; // 转换为毫秒
+                    const now = Date.now();
+                    const timeLeft = expiresTime - now;
+                    const minutesLeft = Math.floor(timeLeft / 60000);
+                    
+                    console.log(`⏰ Token 剩余时间: ${minutesLeft} 分钟`);
+                    
+                    // 如果少于 10 分钟，显示警告
+                    if (minutesLeft < 10 && minutesLeft > 0) {
+                        if (!document.getElementById('tokenExpiryWarning')) {
+                            const warningDiv = document.createElement('div');
+                            warningDiv.id = 'tokenExpiryWarning';
+                            warningDiv.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-900 p-4 rounded shadow-lg z-[10000]';
+                            warningDiv.innerHTML = `
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <span>⚠️ 登录即将过期（${minutesLeft} 分钟），请保存数据后刷新页面重新登录</span>
+                                    <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-yellow-700 hover:text-yellow-900">
+                                        ✕
+                                    </button>
+                                </div>
+                            `;
+                            document.body.appendChild(warningDiv);
+                        }
+                    }
+                    
+                    // 如果已过期，强制重新登录
+                    if (timeLeft <= 0) {
+                        console.error('❌ Token 已过期');
+                        alert('⚠️ 登录已过期！\n\n页面将刷新以重新登录。\n请确保数据已保存到本地。');
+                        location.reload();
+                    }
+                }
+            } catch (error) {
+                console.warn('⚠️ 无法检查 Token 过期时间:', error);
+            }
+        }, 600000); // 每 10 分钟检查一次
         
         // 监听所有用户交互
         document.addEventListener('click', trackUserActivity);
