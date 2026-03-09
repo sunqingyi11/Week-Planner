@@ -2604,31 +2604,74 @@ ${supabaseClient && currentUser ? '✅ 准备上传...' : ''}
             };
             
             // 使用原始 fetch + JWT 直接调用 Supabase REST API
-            const response = await fetch(`${SUPABASE_URL}/rest/v1/user_tasks`, {
-                method: 'POST',
+            // 🔧 先尝试 PATCH 更新，失败则 POST 创建
+            let response = await fetch(`${SUPABASE_URL}/rest/v1/user_tasks?user_id=eq.${userId}`, {
+                method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
                     'apikey': SUPABASE_ANON_KEY,
                     'Authorization': `Bearer ${accessToken}`,
-                    'Prefer': 'resolution=merge-duplicates'
+                    'Prefer': 'return=representation'
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    tasks: tasksData,
+                    calendar_tasks: calendarTasksData,
+                    updated_at: updateTime
+                })
             });
             
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ REST API 错误:', errorText);
+            let result;
+            
+            // 检查 PATCH 响应
+            if (response.ok) {
+                const responseText = await response.text();
+                console.log('📊 PATCH 响应:', responseText.substring(0, 100));
                 
-                // 检查是否是 token 过期
+                result = responseText ? JSON.parse(responseText) : [];
+                
+                // 如果返回空数组，说明记录不存在
+                if (!result || (Array.isArray(result) && result.length === 0)) {
+                    console.log('📝 记录不存在，POST 创建新记录...');
+                    
+                    response = await fetch(`${SUPABASE_URL}/rest/v1/user_tasks`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Prefer': 'return=representation'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('❌ POST 失败:', errorText);
+                        
+                        if (response.status === 401) {
+                            throw new Error('登录已过期，请重新登录');
+                        }
+                        
+                        throw new Error(`POST 失败 (${response.status}): ${errorText}`);
+                    }
+                    
+                    result = await response.json();
+                    console.log('✅ POST 创建成功');
+                } else {
+                    console.log('✅ PATCH 更新成功');
+                }
+            } else {
+                const errorText = await response.text();
+                console.error('❌ PATCH 失败:', errorText);
+                
                 if (response.status === 401) {
-                    throw new Error('登录已过期，请重新登录（Token expired）');
+                    throw new Error('登录已过期，请重新登录');
                 }
                 
-                throw new Error(`上传失败 (${response.status}): ${errorText}`);
+                throw new Error(`PATCH 失败 (${response.status}): ${errorText}`);
             }
             
-            const result = await response.json();
-            console.log('✅ REST API 上传成功');
+            console.log('✅ REST API 操作完成');
             
             return {
                 data: result,
