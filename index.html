@@ -2470,51 +2470,45 @@ ${supabaseClient && currentUser ? '✅ 准备上传...' : ''}
                     calendarTasks: calendarTasks.length
                 });
                 
-                // 🔧 重试逻辑：如果遇到 AbortError 自动重试一次
-                let uploadError = null;
-                let uploadData = null;
+                // 🔧 新方案：使用原始 REST API 绕过 Auth 锁冲突
+                console.log('🚀 使用 REST API 直接上传（绕过 Auth 锁）');
                 
-                try {
-                    const { data, error } = await supabaseClient.from('user_tasks')
-                        .upsert({
-                            user_id: currentUser.id,
-                            tasks: tasks,
-                            calendar_tasks: calendarTasks,
-                            updated_at: updateTime
-                        }, {
-                            onConflict: 'user_id'
-                        });
-                    
-                    uploadData = data;
-                    uploadError = error;
-                } catch (err) {
-                    // 捕获 AbortError 并重试
-                    if (err.message && err.message.includes('Lock broken')) {
-                        console.warn('⚠️ 检测到锁冲突，等待 1 秒后重试...');
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                        
-                        const { data, error } = await supabaseClient.from('user_tasks')
-                            .upsert({
-                                user_id: currentUser.id,
-                                tasks: tasks,
-                                calendar_tasks: calendarTasks,
-                                updated_at: updateTime
-                            }, {
-                                onConflict: 'user_id'
-                            });
-                        
-                        uploadData = data;
-                        uploadError = error;
-                        console.log('✅ 重试成功');
-                    } else {
-                        throw err;
-                    }
+                // 获取当前 session token
+                const { data: sessionData } = await supabaseClient.auth.getSession();
+                if (!sessionData || !sessionData.session) {
+                    throw new Error('无法获取登录会话，请重新登录');
                 }
+                
+                const accessToken = sessionData.session.access_token;
+                
+                // 使用原始 fetch + JWT 直接调用 Supabase REST API
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/user_tasks`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Prefer': 'resolution=merge-duplicates'
+                    },
+                    body: JSON.stringify({
+                        user_id: currentUser.id,
+                        tasks: tasks,
+                        calendar_tasks: calendarTasks,
+                        updated_at: updateTime
+                    })
+                });
                 
                 // 清除超时
                 clearTimeout(uploadTimeout);
                 
-                if (uploadError) throw uploadError
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ REST API 错误:', errorText);
+                    throw new Error(`上传失败 (${response.status}): ${errorText}`);
+                }
+                
+                const uploadData = await response.json();
+                console.log('✅ REST API 上传成功:', uploadData);
                 
                 // ✅ 上传成功
                 const uploadTimestamp = new Date(updateTime).getTime();
